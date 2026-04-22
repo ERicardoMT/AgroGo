@@ -1,9 +1,9 @@
 class User {
   final String id;
-  final String name;
-  final String email;
-  final String phone;
-  final String location;
+  String name;
+  String email;
+  String phone;
+  String location;
   final String? profileImage;
   final List<String> favorites;
   final DateTime createdAt;

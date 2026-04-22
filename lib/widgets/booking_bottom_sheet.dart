@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/equipment.dart';
 import '../theme/app_theme.dart';
+import '../globals.dart'; // <--- IMPORT GLOBAL
 
 class BookingBottomSheet extends StatefulWidget {
   final Equipment equipment;
@@ -39,9 +40,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
     final initialDate = isStart
         ? (_startDate ?? now)
         : (_endDate ?? _startDate ?? now.add(const Duration(days: 1)));
-
     final firstDate = isStart ? now : (_startDate ?? now);
-
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
@@ -58,7 +57,6 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
         );
       },
     );
-
     if (picked != null) {
       setState(() {
         if (isStart) {
@@ -75,17 +73,14 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
 
   void _confirmBooking() async {
     if (_startDate == null || _endDate == null) return;
-
     setState(() => _isLoading = true);
 
     // Simulate API call
     await Future.delayed(const Duration(seconds: 2));
-
     setState(() {
       _isLoading = false;
       _isSuccess = true;
     });
-
     // Close after showing success
     await Future.delayed(const Duration(seconds: 2));
     if (mounted) {
@@ -96,13 +91,14 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd MMM yyyy', 'es_ES');
+    final isDark = Theme.of(context).brightness == Brightness.dark; // DETECCIÓN DE TEMA
 
     if (_isSuccess) {
       return Container(
         padding: const EdgeInsets.all(32),
-        decoration: const BoxDecoration(
-          color: AppTheme.cardColor,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        decoration: BoxDecoration(
+          color: isDark ? Colors.grey[900] : AppTheme.cardColor, // ADAPTACIÓN
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -121,12 +117,12 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
             ),
             const SizedBox(height: 24),
             Text(
-              'Reserva Confirmada',
+              tr('Reserva Confirmada', 'Booking Confirmed'), // TRADUCCIÓN
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
             Text(
-              'Tu reserva ha sido procesada exitosamente',
+              tr('Tu reserva ha sido procesada exitosamente', 'Your booking has been processed successfully'), // TRADUCCIÓN
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
@@ -138,9 +134,9 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
 
     return Container(
       padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: AppTheme.cardColor,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.grey[900] : AppTheme.cardColor, // ADAPTACIÓN
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -152,7 +148,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppTheme.borderColor,
+                color: isDark ? Colors.grey[700] : AppTheme.borderColor, // ADAPTACIÓN
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -161,7 +157,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
           const SizedBox(height: 24),
 
           Text(
-            'Reservar Equipo',
+            tr('Reservar Equipo', 'Book Equipment'), // TRADUCCIÓN
             style: Theme.of(context).textTheme.headlineSmall,
           ),
 
@@ -178,7 +174,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
 
           // Date Selection
           Text(
-            'Selecciona las fechas',
+            tr('Selecciona las fechas', 'Select dates'), // TRADUCCIÓN
             style: Theme.of(context).textTheme.titleMedium,
           ),
 
@@ -188,20 +184,22 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
             children: [
               Expanded(
                 child: _buildDateField(
-                  label: 'Fecha inicio',
+                  label: tr('Fecha inicio', 'Start date'), // TRADUCCIÓN
                   date: _startDate,
                   onTap: () => _selectDate(true),
                   dateFormat: dateFormat,
+                  isDark: isDark, // PASAMOS EL TEMA
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _buildDateField(
-                  label: 'Fecha fin',
+                  label: tr('Fecha fin', 'End date'), // TRADUCCIÓN
                   date: _endDate,
                   onTap: () => _selectDate(false),
                   dateFormat: dateFormat,
                   enabled: _startDate != null,
+                  isDark: isDark, // PASAMOS EL TEMA
                 ),
               ),
             ],
@@ -214,23 +212,23 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppTheme.backgroundColor,
+                color: isDark ? Colors.grey[800] : AppTheme.backgroundColor, // ADAPTACIÓN
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
                 children: [
                   _buildSummaryRow(
-                    'Duración',
-                    '$_daysCount días',
+                    tr('Duración', 'Duration'), // TRADUCCIÓN
+                    tr('$_daysCount días', '$_daysCount days'), // TRADUCCIÓN
                   ),
                   const SizedBox(height: 8),
                   _buildSummaryRow(
-                    'Precio base',
-                    '\$${widget.equipment.pricePerDay.toStringAsFixed(0)}/día',
+                    tr('Precio base', 'Base price'), // TRADUCCIÓN
+                    '\$${widget.equipment.pricePerDay.toStringAsFixed(0)}${tr('/día', '/day')}', // TRADUCCIÓN
                   ),
                   const Divider(height: 24),
                   _buildSummaryRow(
-                    'Total',
+                    tr('Total', 'Total'), // TRADUCCIÓN
                     '\$${_totalPrice.toStringAsFixed(0)} MXN',
                     isTotal: true,
                   ),
@@ -257,7 +255,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                         color: Colors.white,
                       ),
                     )
-                  : const Text('Confirmar Reserva'),
+                  : Text(tr('Confirmar Reserva', 'Confirm Booking')), // TRADUCCIÓN
             ),
           ),
 
@@ -267,22 +265,26 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
     );
   }
 
+  // Agregamos isDark como parámetro para colorear esta cajita
   Widget _buildDateField({
     required String label,
     required DateTime? date,
     required VoidCallback onTap,
     required DateFormat dateFormat,
     bool enabled = true,
+    required bool isDark,
   }) {
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: enabled ? AppTheme.cardColor : AppTheme.backgroundColor,
+          color: enabled 
+              ? (isDark ? Colors.grey[800] : AppTheme.cardColor) // ADAPTACIÓN
+              : (isDark ? Colors.grey[900] : AppTheme.backgroundColor), // ADAPTACIÓN
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: date != null ? AppTheme.primaryColor : AppTheme.borderColor,
+            color: date != null ? AppTheme.primaryColor : (isDark ? Colors.grey[700]! : AppTheme.borderColor), // ADAPTACIÓN
           ),
         ),
         child: Column(
@@ -307,10 +309,10 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  date != null ? dateFormat.format(date) : 'Seleccionar',
+                  date != null ? dateFormat.format(date) : tr('Seleccionar', 'Select'), // TRADUCCIÓN
                   style: TextStyle(
                     color: date != null
-                        ? AppTheme.textPrimary
+                        ? (isDark ? Colors.white : AppTheme.textPrimary) // ADAPTACIÓN
                         : AppTheme.textMuted,
                     fontWeight:
                         date != null ? FontWeight.w500 : FontWeight.normal,
@@ -325,6 +327,8 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
   }
 
   Widget _buildSummaryRow(String label, String value, {bool isTotal = false}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -333,7 +337,9 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
           style: TextStyle(
             fontSize: isTotal ? 16 : 14,
             fontWeight: isTotal ? FontWeight.w600 : FontWeight.normal,
-            color: isTotal ? AppTheme.textPrimary : AppTheme.textSecondary,
+            color: isTotal 
+                ? (isDark ? Colors.white : AppTheme.textPrimary) // ADAPTACIÓN
+                : AppTheme.textSecondary,
           ),
         ),
         Text(
@@ -341,7 +347,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
           style: TextStyle(
             fontSize: isTotal ? 18 : 14,
             fontWeight: isTotal ? FontWeight.bold : FontWeight.w500,
-            color: isTotal ? AppTheme.primaryColor : AppTheme.textPrimary,
+            color: isTotal ? AppTheme.primaryColor : (isDark ? Colors.white : AppTheme.textPrimary), // ADAPTACIÓN
           ),
         ),
       ],

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/booking.dart';
 import '../theme/app_theme.dart';
+import '../globals.dart'; // <--- IMPORT GLOBAL
 
 class BookingCard extends StatelessWidget {
   final Booking booking;
-
   const BookingCard({super.key, required this.booking});
 
   Color _getStatusColor() {
@@ -42,13 +42,24 @@ class BookingCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('dd MMM', 'es_ES');
     final statusColor = _getStatusColor();
+    final isDark = Theme.of(context).brightness == Brightness.dark; // DETECCIÓN DE TEMA
+
+    // TRADUCCIÓN DEL ESTADO (Usando la variable booking.statusText como base)
+    String translatedStatus;
+    switch (booking.statusText.toLowerCase()) {
+      case 'confirmada': translatedStatus = tr('Confirmada', 'Confirmed'); break;
+      case 'activa': translatedStatus = tr('Activa', 'Active'); break;
+      case 'completada': translatedStatus = tr('Completada', 'Completed'); break;
+      case 'cancelada': translatedStatus = tr('Cancelada', 'Cancelled'); break;
+      default: translatedStatus = tr('Pendiente', 'Pending');
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.cardColor,
+        color: isDark ? Colors.grey[900] : AppTheme.cardColor, // ADAPTACIÓN
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderColor),
+        border: Border.all(color: isDark ? Colors.grey[800]! : AppTheme.borderColor), // ADAPTACIÓN
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -63,7 +74,7 @@ class BookingCard extends StatelessWidget {
                   color: AppTheme.primaryColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.agriculture,
                   color: AppTheme.primaryColor,
                   size: 28,
@@ -113,7 +124,7 @@ class BookingCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      booking.statusText,
+                      translatedStatus, // TEXTO TRADUCIDO
                       style: TextStyle(
                         color: statusColor,
                         fontSize: 12,
@@ -127,7 +138,7 @@ class BookingCard extends StatelessWidget {
           ),
 
           const SizedBox(height: 16),
-          const Divider(height: 1),
+          Divider(height: 1, color: isDark ? Colors.grey[800] : null), // ADAPTACIÓN
           const SizedBox(height: 16),
 
           // Details Row
@@ -157,11 +168,11 @@ class BookingCard extends StatelessWidget {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: AppTheme.backgroundColor,
+                  color: isDark ? Colors.grey[800] : AppTheme.backgroundColor, // ADAPTACIÓN
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '${booking.daysCount} días',
+                  tr('${booking.daysCount} días', '${booking.daysCount} days'), // TRADUCCIÓN
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         fontWeight: FontWeight.w500,
                       ),
@@ -177,7 +188,7 @@ class BookingCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Total',
+                tr('Total', 'Total'), // TRADUCCIÓN
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               Text(
@@ -199,14 +210,14 @@ class BookingCard extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {},
-                    child: const Text('Contactar'),
+                    child: Text(tr('Contactar', 'Contact')), // TRADUCCIÓN
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {},
-                    child: const Text('Ver detalles'),
+                    child: Text(tr('Ver detalles', 'View details')), // TRADUCCIÓN
                   ),
                 ),
               ],

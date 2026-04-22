@@ -3,6 +3,7 @@ import '../data/mock_data.dart';
 import '../models/booking.dart';
 import '../theme/app_theme.dart';
 import '../widgets/booking_card.dart';
+import '../globals.dart'; // <--- IMPORT GLOBAL
 
 class BookingsScreen extends StatefulWidget {
   const BookingsScreen({super.key});
@@ -51,6 +52,9 @@ class _BookingsScreenState extends State<BookingsScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Detectamos el modo oscuro
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return SafeArea(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -58,7 +62,7 @@ class _BookingsScreenState extends State<BookingsScreen>
           Padding(
             padding: const EdgeInsets.all(20),
             child: Text(
-              'Mis Reservas',
+              tr('Mis Reservas', 'My Bookings'), // TRADUCCIÓN
               style: Theme.of(context).textTheme.headlineMedium,
             ),
           ),
@@ -67,9 +71,9 @@ class _BookingsScreenState extends State<BookingsScreen>
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
             decoration: BoxDecoration(
-              color: AppTheme.cardColor,
+              color: isDark ? Colors.grey[900] : AppTheme.cardColor, // ADAPTACIÓN
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.borderColor),
+              border: Border.all(color: isDark ? Colors.grey[800]! : AppTheme.borderColor), // ADAPTACIÓN
             ),
             child: TabBar(
               controller: _tabController,
@@ -81,10 +85,10 @@ class _BookingsScreenState extends State<BookingsScreen>
               labelColor: Colors.white,
               unselectedLabelColor: AppTheme.textSecondary,
               dividerColor: Colors.transparent,
-              tabs: const [
-                Tab(text: 'Todas'),
-                Tab(text: 'Activas'),
-                Tab(text: 'Historial'),
+              tabs: [
+                Tab(text: tr('Todas', 'All')), // TRADUCCIÓN
+                Tab(text: tr('Activas', 'Active')), // TRADUCCIÓN
+                Tab(text: tr('Historial', 'History')), // TRADUCCIÓN
               ],
             ),
           ),
@@ -122,12 +126,12 @@ class _BookingsScreenState extends State<BookingsScreen>
             ),
             const SizedBox(height: 16),
             Text(
-              'No hay reservas',
+              tr('No hay reservas', 'No bookings'), // TRADUCCIÓN
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             Text(
-              'Cuando realices una reserva aparecerá aquí',
+              tr('Cuando realices una reserva aparecerá aquí', 'When you make a booking, it will appear here'), // TRADUCCIÓN
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],

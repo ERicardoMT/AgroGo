@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/category.dart';
 import '../theme/app_theme.dart';
+import '../globals.dart'; // <--- IMPORT GLOBAL
 
 class CategoryChip extends StatelessWidget {
   final Category category;
@@ -16,6 +17,19 @@ class CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark; // DETECCIÓN DE TEMA
+
+    // Pequeño traductor para los nombres de las categorías que vienen de la base de datos
+    String translatedName = category.name;
+    if (languageNotifier.value == 'Inglés') {
+      switch (category.name) {
+        case 'Tractores': translatedName = 'Tractors'; break;
+        case 'Cosechadoras': translatedName = 'Harvesters'; break;
+        case 'Riego': translatedName = 'Irrigation'; break;
+        case 'Sembradoras': translatedName = 'Seeders'; break;
+      }
+    }
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -25,10 +39,12 @@ class CategoryChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? AppTheme.primaryColor.withOpacity(0.1)
-              : AppTheme.cardColor,
+              : (isDark ? Colors.grey[900] : AppTheme.cardColor), // ADAPTACIÓN
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppTheme.primaryColor : AppTheme.borderColor,
+            color: isSelected 
+                ? AppTheme.primaryColor 
+                : (isDark ? Colors.grey[800]! : AppTheme.borderColor), // ADAPTACIÓN
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -40,7 +56,7 @@ class CategoryChip extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected
                     ? AppTheme.primaryColor.withOpacity(0.15)
-                    : AppTheme.backgroundColor,
+                    : (isDark ? Colors.grey[800] : AppTheme.backgroundColor), // ADAPTACIÓN
                 shape: BoxShape.circle,
               ),
               child: Text(
@@ -50,11 +66,13 @@ class CategoryChip extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              category.name,
+              translatedName, // NOMBRE TRADUCIDO
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                color: isSelected ? AppTheme.primaryColor : AppTheme.textPrimary,
+                color: isSelected 
+                    ? AppTheme.primaryColor 
+                    : (isDark ? Colors.white : AppTheme.textPrimary), // ADAPTACIÓN
               ),
               textAlign: TextAlign.center,
               maxLines: 1,

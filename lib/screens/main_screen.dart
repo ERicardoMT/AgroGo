@@ -4,6 +4,7 @@ import 'search_screen.dart';
 import 'bookings_screen.dart';
 import 'favorites_screen.dart';
 import 'profile_screen.dart';
+import '../globals.dart'; // <--- IMPORT GLOBAL
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -28,6 +29,8 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark; // DETECCIÓN DE TEMA
+
     final screens = [
       HomeScreen(
         favoriteIds: _favoriteIds,
@@ -51,7 +54,7 @@ class _MainScreenState extends State<MainScreen> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.05), // ADAPTACIÓN
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
@@ -60,31 +63,31 @@ class _MainScreenState extends State<MainScreen> {
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (index) => setState(() => _currentIndex = index),
-          items: const [
+          items: [
             BottomNavigationBarItem(
-              icon: Icon(Icons.home_outlined),
-              activeIcon: Icon(Icons.home),
-              label: 'Inicio',
+              icon: const Icon(Icons.home_outlined),
+              activeIcon: const Icon(Icons.home),
+              label: tr('Inicio', 'Home'), // TRADUCCIÓN
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.search_outlined),
-              activeIcon: Icon(Icons.search),
-              label: 'Buscar',
+              icon: const Icon(Icons.search_outlined),
+              activeIcon: const Icon(Icons.search),
+              label: tr('Buscar', 'Search'), // TRADUCCIÓN
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today_outlined),
-              activeIcon: Icon(Icons.calendar_today),
-              label: 'Reservas',
+              icon: const Icon(Icons.calendar_today_outlined),
+              activeIcon: const Icon(Icons.calendar_today),
+              label: tr('Reservas', 'Bookings'), // TRADUCCIÓN
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.favorite_outline),
-              activeIcon: Icon(Icons.favorite),
-              label: 'Favoritos',
+              icon: const Icon(Icons.favorite_outline),
+              activeIcon: const Icon(Icons.favorite),
+              label: tr('Favoritos', 'Favorites'), // TRADUCCIÓN
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline),
-              activeIcon: Icon(Icons.person),
-              label: 'Perfil',
+              icon: const Icon(Icons.person_outline),
+              activeIcon: const Icon(Icons.person),
+              label: tr('Perfil', 'Profile'), // TRADUCCIÓN
             ),
           ],
         ),

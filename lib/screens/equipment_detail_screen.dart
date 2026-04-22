@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/equipment.dart';
 import '../theme/app_theme.dart';
 import '../widgets/booking_bottom_sheet.dart';
+import '../globals.dart'; // <--- IMPORT GLOBAL
 
 class EquipmentDetailScreen extends StatefulWidget {
   final Equipment equipment;
@@ -39,6 +40,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final equipment = widget.equipment;
+    final isDark = Theme.of(context).brightness == Brightness.dark; // <--- DETECTOR DE TEMA
 
     return Scaffold(
       body: CustomScrollView(
@@ -47,13 +49,13 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
           SliverAppBar(
             expandedHeight: 280,
             pinned: true,
-            backgroundColor: AppTheme.backgroundColor,
+            backgroundColor: isDark ? Colors.grey[900] : AppTheme.backgroundColor, // ADAPTACIÓN
             leading: IconButton(
               onPressed: () => Navigator.pop(context),
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppTheme.cardColor,
+                  color: isDark ? Colors.grey[800] : AppTheme.cardColor, // ADAPTACIÓN
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
@@ -62,7 +64,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                     ),
                   ],
                 ),
-                child: const Icon(Icons.arrow_back),
+                child: Icon(Icons.arrow_back, color: isDark ? Colors.white : Colors.black),
               ),
             ),
             actions: [
@@ -71,7 +73,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                 icon: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.cardColor,
+                    color: isDark ? Colors.grey[800] : AppTheme.cardColor, // ADAPTACIÓN
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
@@ -82,7 +84,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                   ),
                   child: Icon(
                     _isFavorite ? Icons.favorite : Icons.favorite_outline,
-                    color: _isFavorite ? Colors.red : AppTheme.textPrimary,
+                    color: _isFavorite ? Colors.red : (isDark ? Colors.white : AppTheme.textPrimary),
                   ),
                 ),
               ),
@@ -91,7 +93,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                 icon: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppTheme.cardColor,
+                    color: isDark ? Colors.grey[800] : AppTheme.cardColor, // ADAPTACIÓN
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
@@ -100,7 +102,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.share),
+                  child: Icon(Icons.share, color: isDark ? Colors.white : Colors.black),
                 ),
               ),
               const SizedBox(width: 8),
@@ -142,8 +144,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                 children: [
                   // Status Badge
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: equipment.available
                           ? AppTheme.successColor.withOpacity(0.1)
@@ -151,11 +152,9 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      equipment.available ? 'Disponible' : 'No disponible',
+                      equipment.available ? tr('Disponible', 'Available') : tr('No disponible', 'Not available'), // TRADUCCIÓN
                       style: TextStyle(
-                        color: equipment.available
-                            ? AppTheme.successColor
-                            : AppTheme.textMuted,
+                        color: equipment.available ? AppTheme.successColor : AppTheme.textMuted,
                         fontWeight: FontWeight.w500,
                         fontSize: 12,
                       ),
@@ -187,7 +186,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '(${equipment.reviewCount} reseñas)',
+                        tr('(${equipment.reviewCount} reseñas)', '(${equipment.reviewCount} reviews)'), // TRADUCCIÓN
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       const Spacer(),
@@ -208,7 +207,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
 
                   // Description
                   Text(
-                    'Descripción',
+                    tr('Descripción', 'Description'), // TRADUCCIÓN
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 8),
@@ -224,16 +223,16 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
 
                   // Specifications
                   Text(
-                    'Especificaciones',
+                    tr('Especificaciones', 'Specifications'), // TRADUCCIÓN
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppTheme.cardColor,
+                      color: isDark ? Colors.grey[900] : AppTheme.cardColor, // ADAPTACIÓN
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.borderColor),
+                      border: Border.all(color: isDark ? Colors.grey[800]! : AppTheme.borderColor), // ADAPTACIÓN
                     ),
                     child: Column(
                       children: equipment.specs.entries.map((entry) {
@@ -266,7 +265,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
 
                   // Pricing Options
                   Text(
-                    'Opciones de renta',
+                    tr('Opciones de renta', 'Rental options'), // TRADUCCIÓN
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 12),
@@ -275,21 +274,21 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                       _buildPriceOption(
                         context,
                         index: 0,
-                        label: 'Por día',
+                        label: tr('Por día', 'Per day'), // TRADUCCIÓN
                         price: equipment.pricePerDay,
                       ),
                       const SizedBox(width: 12),
                       _buildPriceOption(
                         context,
                         index: 1,
-                        label: 'Por semana',
+                        label: tr('Por semana', 'Per week'), // TRADUCCIÓN
                         price: equipment.pricePerWeek,
                       ),
                       const SizedBox(width: 12),
                       _buildPriceOption(
                         context,
                         index: 2,
-                        label: 'Por mes',
+                        label: tr('Por mes', 'Per month'), // TRADUCCIÓN
                         price: equipment.pricePerMonth,
                       ),
                     ],
@@ -299,26 +298,25 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
 
                   // Owner Info
                   Text(
-                    'Propietario',
+                    tr('Propietario', 'Owner'), // TRADUCCIÓN
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppTheme.cardColor,
+                      color: isDark ? Colors.grey[900] : AppTheme.cardColor, // ADAPTACIÓN
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppTheme.borderColor),
+                      border: Border.all(color: isDark ? Colors.grey[800]! : AppTheme.borderColor), // ADAPTACIÓN
                     ),
                     child: Row(
                       children: [
                         CircleAvatar(
                           radius: 25,
-                          backgroundColor:
-                              AppTheme.primaryColor.withOpacity(0.1),
+                          backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
                           child: Text(
                             equipment.ownerName[0],
-                            style: TextStyle(
+                            style: const TextStyle(
                               color: AppTheme.primaryColor,
                               fontWeight: FontWeight.bold,
                               fontSize: 18,
@@ -343,9 +341,8 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    'Verificado',
-                                    style:
-                                        Theme.of(context).textTheme.bodySmall,
+                                    tr('Verificado', 'Verified'), // TRADUCCIÓN
+                                    style: Theme.of(context).textTheme.bodySmall,
                                   ),
                                 ],
                               ),
@@ -380,7 +377,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
       bottomNavigationBar: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppTheme.cardColor,
+          color: isDark ? Colors.grey[900] : AppTheme.cardColor, // ADAPTACIÓN
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -397,11 +394,11 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Desde',
+                    tr('Desde', 'From'), // TRADUCCIÓN
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   Text(
-                    '\$${equipment.pricePerDay.toStringAsFixed(0)}/día',
+                    '\$${equipment.pricePerDay.toStringAsFixed(0)}${tr('/día', '/day')}', // TRADUCCIÓN
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           color: AppTheme.primaryColor,
                           fontWeight: FontWeight.bold,
@@ -418,12 +415,11 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                             context: context,
                             isScrollControlled: true,
                             backgroundColor: Colors.transparent,
-                            builder: (context) =>
-                                BookingBottomSheet(equipment: equipment),
+                            builder: (context) => BookingBottomSheet(equipment: equipment),
                           );
                         }
                       : null,
-                  child: const Text('Reservar ahora'),
+                  child: Text(tr('Reservar ahora', 'Book now')), // TRADUCCIÓN
                 ),
               ),
             ],
@@ -440,6 +436,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
     required double price,
   }) {
     final isSelected = _selectedPriceOption == index;
+    final isDark = Theme.of(context).brightness == Brightness.dark; // <--- DETECTOR DE TEMA LOCAL
 
     return Expanded(
       child: GestureDetector(
@@ -449,10 +446,10 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
           decoration: BoxDecoration(
             color: isSelected
                 ? AppTheme.primaryColor.withOpacity(0.1)
-                : AppTheme.cardColor,
+                : (isDark ? Colors.grey[800] : AppTheme.cardColor), // ADAPTACIÓN
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected ? AppTheme.primaryColor : AppTheme.borderColor,
+              color: isSelected ? AppTheme.primaryColor : (isDark ? Colors.grey[700]! : AppTheme.borderColor), // ADAPTACIÓN
               width: isSelected ? 2 : 1,
             ),
           ),
@@ -472,7 +469,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: isSelected
                           ? AppTheme.primaryColor
-                          : AppTheme.textPrimary,
+                          : (isDark ? Colors.white : AppTheme.textPrimary), // ADAPTACIÓN
                       fontWeight: FontWeight.bold,
                     ),
               ),

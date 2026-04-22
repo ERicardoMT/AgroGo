@@ -4,6 +4,7 @@ import '../models/equipment.dart';
 import '../theme/app_theme.dart';
 import '../widgets/equipment_card.dart';
 import 'equipment_detail_screen.dart';
+import '../globals.dart'; // <--- IMPORT GLOBAL
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -18,13 +19,13 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Equipment> _results = [];
   bool _hasSearched = false;
   final Set<String> _favorites = {};
-
+  
   final List<String> _recentSearches = [
     'Tractor John Deere',
     'Sistema de riego',
     'Cosechadora',
   ];
-
+  
   final List<String> _popularSearches = [
     'Tractores 4WD',
     'Drones fumigación',
@@ -61,6 +62,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark; // <--- DETECTOR DE TEMA
+
     return SafeArea(
       child: Column(
         children: [
@@ -71,7 +74,7 @@ class _SearchScreenState extends State<SearchScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Buscar',
+                  tr('Buscar', 'Search'), // TRADUCCIÓN
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 16),
@@ -80,7 +83,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   focusNode: _focusNode,
                   onChanged: _performSearch,
                   decoration: InputDecoration(
-                    hintText: 'Buscar equipo agrícola...',
+                    hintText: tr('Buscar equipo agrícola...', 'Search agricultural equipment...'), // TRADUCCIÓN
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
@@ -99,14 +102,14 @@ class _SearchScreenState extends State<SearchScreen> {
 
           // Content
           Expanded(
-            child: _hasSearched ? _buildResults() : _buildSuggestions(),
+            child: _hasSearched ? _buildResults() : _buildSuggestions(isDark),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSuggestions() {
+  Widget _buildSuggestions(bool isDark) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Column(
@@ -118,14 +121,14 @@ class _SearchScreenState extends State<SearchScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Búsquedas recientes',
+                  tr('Búsquedas recientes', 'Recent searches'), // TRADUCCIÓN
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 TextButton(
                   onPressed: () {
                     // Clear recent searches
                   },
-                  child: const Text('Limpiar'),
+                  child: Text(tr('Limpiar', 'Clear')), // TRADUCCIÓN
                 ),
               ],
             ),
@@ -137,6 +140,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 return ActionChip(
                   avatar: const Icon(Icons.history, size: 18),
                   label: Text(search),
+                  backgroundColor: isDark ? Colors.grey[800] : null, // ADAPTACIÓN
                   onPressed: () {
                     _searchController.text = search;
                     _performSearch(search);
@@ -149,7 +153,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
           // Popular Searches
           Text(
-            'Búsquedas populares',
+            tr('Búsquedas populares', 'Popular searches'), // TRADUCCIÓN
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
@@ -160,7 +164,7 @@ class _SearchScreenState extends State<SearchScreen> {
               return ActionChip(
                 avatar: const Icon(Icons.trending_up, size: 18),
                 label: Text(search),
-                backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                backgroundColor: isDark ? Colors.grey[800] : AppTheme.primaryColor.withOpacity(0.1), // ADAPTACIÓN
                 onPressed: () {
                   _searchController.text = search;
                   _performSearch(search);
@@ -172,7 +176,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
           // Categories
           Text(
-            'Explorar por categoría',
+            tr('Explorar por categoría', 'Explore by category'), // TRADUCCIÓN
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 12),
@@ -192,10 +196,9 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               title: Text(category.name),
               trailing: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppTheme.backgroundColor,
+                  color: isDark ? Colors.grey[800] : AppTheme.backgroundColor, // ADAPTACIÓN
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -215,76 +218,74 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildResults() {
-    if (_results.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.search_off,
-              size: 64,
-              color: AppTheme.textMuted,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No se encontraron resultados',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Intenta con otros términos de búsqueda',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ],
-        ),
-      );
-    }
-
-    return GridView.builder(
-      padding: const EdgeInsets.all(20),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 16,
-        crossAxisSpacing: 16,
-        childAspectRatio: 0.72,
-      ),
-      itemCount: _results.length,
-      itemBuilder: (context, index) {
-        final equipment = _results[index];
-        return EquipmentCard(
-          equipment: equipment,
-          isFavorite: _favorites.contains(equipment.id),
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => EquipmentDetailScreen(
-                  equipment: equipment,
-                  isFavorite: _favorites.contains(equipment.id),
-                  onToggleFavorite: () {
-                    setState(() {
-                      if (_favorites.contains(equipment.id)) {
-                        _favorites.remove(equipment.id);
-                      } else {
-                        _favorites.add(equipment.id);
-                      }
-                    });
-                  },
+    return _results.isEmpty
+        ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.search_off,
+                  size: 64,
+                  color: AppTheme.textMuted,
                 ),
-              ),
-            );
-          },
-          onFavoriteTap: () {
-            setState(() {
-              if (_favorites.contains(equipment.id)) {
-                _favorites.remove(equipment.id);
-              } else {
-                _favorites.add(equipment.id);
-              }
-            });
-          },
-        );
-      },
-    );
+                const SizedBox(height: 16),
+                Text(
+                  tr('No se encontraron resultados', 'No results found'), // TRADUCCIÓN
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  tr('Intenta con otros términos de búsqueda', 'Try other search terms'), // TRADUCCIÓN
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          )
+        : GridView.builder(
+            padding: const EdgeInsets.all(20),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              childAspectRatio: 0.72,
+            ),
+            itemCount: _results.length,
+            itemBuilder: (context, index) {
+              final equipment = _results[index];
+              return EquipmentCard(
+                equipment: equipment,
+                isFavorite: _favorites.contains(equipment.id),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EquipmentDetailScreen(
+                        equipment: equipment,
+                        isFavorite: _favorites.contains(equipment.id),
+                        onToggleFavorite: () {
+                          setState(() {
+                            if (_favorites.contains(equipment.id)) {
+                              _favorites.remove(equipment.id);
+                            } else {
+                              _favorites.add(equipment.id);
+                            }
+                          });
+                        },
+                      ),
+                    ),
+                  );
+                },
+                onFavoriteTap: () {
+                  setState(() {
+                    if (_favorites.contains(equipment.id)) {
+                      _favorites.remove(equipment.id);
+                    } else {
+                      _favorites.add(equipment.id);
+                    }
+                  });
+                },
+              );
+            },
+          );
   }
 }

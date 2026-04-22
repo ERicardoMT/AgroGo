@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../widgets/equipment_card.dart';
 import '../widgets/category_chip.dart';
 import 'equipment_detail_screen.dart';
+import '../globals.dart'; // <--- IMPORT GLOBAL
 
 class HomeScreen extends StatefulWidget {
   final Set<String> favoriteIds;
@@ -29,6 +30,8 @@ class _HomeScreenState extends State<HomeScreen> {
         : MockData.equipmentList
             .where((e) => e.category == selectedCategory)
             .toList();
+            
+    final isDark = Theme.of(context).brightness == Brightness.dark; // <--- DETECTOR DE TEMA
 
     return SafeArea(
       child: CustomScrollView(
@@ -44,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Hola, ${MockData.currentUser.name.split(' ')[0]}',
+                          tr('Hola, ${MockData.currentUser.name.split(' ')[0]}', 'Hello, ${MockData.currentUser.name.split(' ')[0]}'), // TRADUCCIÓN
                           style: Theme.of(context).textTheme.headlineSmall,
                         ),
                         const SizedBox(height: 4),
@@ -70,13 +73,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: AppTheme.cardColor,
+                          color: isDark ? Colors.grey[900] : AppTheme.cardColor, // ADAPTACIÓN
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppTheme.borderColor),
+                          border: Border.all(color: isDark ? Colors.grey[800]! : AppTheme.borderColor), // ADAPTACIÓN
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.notifications_outlined,
-                          color: AppTheme.textPrimary,
+                          color: isDark ? Colors.white : AppTheme.textPrimary, // ADAPTACIÓN
                         ),
                       ),
                       Positioned(
@@ -112,9 +115,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     vertical: 14,
                   ),
                   decoration: BoxDecoration(
-                    color: AppTheme.cardColor,
+                    color: isDark ? Colors.grey[900] : AppTheme.cardColor, // ADAPTACIÓN
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.borderColor),
+                    border: Border.all(color: isDark ? Colors.grey[800]! : AppTheme.borderColor), // ADAPTACIÓN
                   ),
                   child: Row(
                     children: [
@@ -124,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(width: 12),
                       Text(
-                        'Buscar equipo agrícola...',
+                        tr('Buscar equipo agrícola...', 'Search agricultural equipment...'), // TRADUCCIÓN
                         style: TextStyle(
                           color: AppTheme.textMuted,
                           fontSize: 16,
@@ -147,7 +150,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text(
-                    'Categorías',
+                    tr('Categorías', 'Categories'), // TRADUCCIÓN
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                 ),
@@ -191,11 +194,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    selectedCategory ?? 'Equipo Disponible',
+                    selectedCategory ?? tr('Equipo Disponible', 'Available Equipment'), // TRADUCCIÓN
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   Text(
-                    '${filteredEquipment.length} equipos',
+                    tr('${filteredEquipment.length} equipos', '${filteredEquipment.length} equipment'), // TRADUCCIÓN
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
                 ],

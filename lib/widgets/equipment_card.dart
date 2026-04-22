@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/equipment.dart';
 import '../theme/app_theme.dart';
+import '../globals.dart'; // <--- IMPORT GLOBAL
 
 class EquipmentCard extends StatelessWidget {
   final Equipment equipment;
@@ -18,16 +19,18 @@ class EquipmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark; // DETECCIÓN DE TEMA
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: AppTheme.cardColor,
+          color: isDark ? Colors.grey[900] : AppTheme.cardColor, // ADAPTACIÓN
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppTheme.borderColor),
+          border: Border.all(color: isDark ? Colors.grey[800]! : AppTheme.borderColor), // ADAPTACIÓN
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.03),
+              color: isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.03), // ADAPTACIÓN
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -43,7 +46,7 @@ class EquipmentCard extends StatelessWidget {
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.08),
+                      color: isDark ? Colors.grey[800] : AppTheme.primaryColor.withOpacity(0.08), // ADAPTACIÓN
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(16),
                       ),
@@ -72,7 +75,9 @@ class EquipmentCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        equipment.available ? 'Disponible' : 'No disponible',
+                        equipment.available 
+                            ? tr('Disponible', 'Available') 
+                            : tr('No disponible', 'Unavailable'), // TRADUCCIÓN
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 10,
@@ -90,14 +95,13 @@ class EquipmentCard extends StatelessWidget {
                       child: Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: AppTheme.cardColor.withOpacity(0.9),
+                          color: isDark ? Colors.grey[900]!.withOpacity(0.9) : AppTheme.cardColor.withOpacity(0.9), // ADAPTACIÓN
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           isFavorite ? Icons.favorite : Icons.favorite_outline,
                           size: 18,
-                          color:
-                              isFavorite ? Colors.red : AppTheme.textSecondary,
+                          color: isFavorite ? Colors.red : (isDark ? Colors.grey[400] : AppTheme.textSecondary), // ADAPTACIÓN
                         ),
                       ),
                     ),
@@ -118,6 +122,7 @@ class EquipmentCard extends StatelessWidget {
                       equipment.name,
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : null, // ADAPTACIÓN
                           ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -125,7 +130,7 @@ class EquipmentCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.star,
                           size: 14,
                           color: AppTheme.accentColor,
@@ -133,7 +138,9 @@ class EquipmentCard extends StatelessWidget {
                         const SizedBox(width: 2),
                         Text(
                           equipment.rating.toString(),
-                          style: Theme.of(context).textTheme.bodySmall,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: isDark ? Colors.grey[300] : null,
+                          ),
                         ),
                         const SizedBox(width: 8),
                         Icon(
@@ -168,7 +175,7 @@ class EquipmentCard extends StatelessWidget {
                                   ),
                         ),
                         Text(
-                          '/día',
+                          tr('/día', '/day'), // TRADUCCIÓN
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: AppTheme.textMuted,

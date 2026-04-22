@@ -3,6 +3,7 @@ import '../data/mock_data.dart';
 import '../theme/app_theme.dart';
 import '../widgets/equipment_card.dart';
 import 'equipment_detail_screen.dart';
+import '../globals.dart'; // <--- IMPORT GLOBAL
 
 class FavoritesScreen extends StatelessWidget {
   final Set<String> favoriteIds;
@@ -19,6 +20,8 @@ class FavoritesScreen extends StatelessWidget {
     final favoriteEquipment = MockData.equipmentList
         .where((e) => favoriteIds.contains(e.id))
         .toList();
+        
+    final isDark = Theme.of(context).brightness == Brightness.dark; // <--- DETECCIÓN DE TEMA
 
     return SafeArea(
       child: Column(
@@ -30,12 +33,12 @@ class FavoritesScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Favoritos',
+                  tr('Favoritos', 'Favorites'), // TRADUCCIÓN
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${favoriteEquipment.length} equipos guardados',
+                  tr('${favoriteEquipment.length} equipos guardados', '${favoriteEquipment.length} saved equipment'), // TRADUCCIÓN
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
@@ -94,14 +97,14 @@ class FavoritesScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Sin favoritos aún',
+            tr('Sin favoritos aún', 'No favorites yet'), // TRADUCCIÓN
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              'Guarda tus equipos favoritos para acceder rápidamente',
+              tr('Guarda tus equipos favoritos para acceder rápidamente', 'Save your favorite equipment to access quickly'), // TRADUCCIÓN
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),
