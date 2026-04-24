@@ -1,10 +1,19 @@
 import 'package:flutter/material.dart';
 
-// 1. Controladores globales
+// Control global de tema.
+// Optimización local: ValueNotifier evita meter un gestor de estado grande
+// para un proyecto que todavía maneja cambios sencillos de UI.
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
+
+// Control global de idioma.
 final ValueNotifier<String> languageNotifier = ValueNotifier('Español');
 
-// 2. Función traductora global (accesible desde cualquier archivo)
+// Control simple de sesión.
+// Optimización de flujo: con este notifier no recreamos toda la arquitectura;
+// solo cambiamos entre LoginScreen y MainScreen desde main.dart.
+final ValueNotifier<bool> isLoggedInNotifier = ValueNotifier(false);
+
+// Traductor global usado por las pantallas actuales.
 String tr(String espanol, String ingles) {
   return languageNotifier.value == 'Español' ? espanol : ingles;
 }
