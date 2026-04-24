@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
+
+import 'globals.dart';
+import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
 import 'theme/app_theme.dart';
-import 'globals.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('es_ES', null); 
+
+  await initializeDateFormatting('es_ES', null);
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -15,7 +18,8 @@ void main() async {
       statusBarIconBrightness: Brightness.dark,
     ),
   );
-  runApp(const AgroGoApp()); 
+
+  runApp(const AgroGoApp());
 }
 
 class AgroGoApp extends StatelessWidget {
@@ -29,18 +33,25 @@ class AgroGoApp extends StatelessWidget {
         return ValueListenableBuilder<ThemeMode>(
           valueListenable: themeNotifier,
           builder: (context, currentMode, child) {
-            return MaterialApp(
-              key: ValueKey(currentLang), 
-              title: 'AgroGo',
-              debugShowCheckedModeBanner: false,
-              theme: AppTheme.lightTheme,
-              darkTheme: AppTheme.darkTheme,
-              themeMode: currentMode, 
-              home: const MainScreen(),
+            return ValueListenableBuilder<bool>(
+              valueListenable: isLoggedInNotifier,
+              builder: (context, isLoggedIn, child) {
+                return MaterialApp(
+                  key: ValueKey('$currentLang-$currentMode-$isLoggedIn'),
+                  title: 'AgroGo',
+                  debugShowCheckedModeBanner: false,
+                  theme: AppTheme.lightTheme,
+                  darkTheme: AppTheme.darkTheme,
+                  themeMode: currentMode,
+                  home: isLoggedIn
+                      ? const MainScreen()
+                      : const LoginScreen(),
+                );
+              },
             );
           },
         );
-      }
+      },
     );
   }
 }
