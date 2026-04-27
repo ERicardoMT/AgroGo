@@ -359,7 +359,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: () {},
+                onPressed: () {
+                  isLoggedInNotifier.value = false;
+                  },
                 icon: const Icon(Icons.logout, color: AppTheme.errorColor),
                 label: Text(
                   tr('Cerrar sesión', 'Log out'),
