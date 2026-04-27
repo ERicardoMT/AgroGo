@@ -5,6 +5,9 @@ import '../data/mock_data.dart';
 import '../theme/app_theme.dart';
 import 'personal_info_screen.dart';
 import '../globals.dart'; // <--- Importamos los megáfonos globales
+import 'help_center_screen.dart';
+import 'contact_support_screen.dart';
+import 'terms_conditions_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -340,19 +343,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _MenuItem(
                 icon: Icons.help_outline,
                 title: tr('Centro de ayuda', 'Help Center'),
-                onTap: () {},
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const HelpCenterScreen(),
+                    ),
+                  );
+                },
               ),
+
               _MenuItem(
                 icon: Icons.chat_outlined,
                 title: tr('Contactar soporte', 'Contact Support'),
-                onTap: () {},
-              ),
-              _MenuItem(
-                icon: Icons.description_outlined,
-                title: tr('Términos y condiciones', 'Terms & Conditions'),
-                onTap: () {},
-              ),
-            ]),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ContactSupportScreen(),
+                    ),
+                );
+              },
+            ),
+  _MenuItem(
+    icon: Icons.description_outlined,
+    title: tr('Términos y condiciones', 'Terms & Conditions'),
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const TermsConditionsScreen(),
+        ),
+      );
+    },
+  ),
+]),
 
             const SizedBox(height: 24),
 
