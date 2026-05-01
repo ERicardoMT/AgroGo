@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import '../models/booking.dart';
 import '../theme/app_theme.dart';
 import '../globals.dart'; // <--- IMPORT GLOBAL
+import '../screens/chat_screen.dart';
+import '../screens/booking_detail_screen.dart';
 
 class BookingCard extends StatelessWidget {
   final Booking booking;
@@ -209,14 +211,33 @@ class BookingCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ChatScreen(
+                            otherUserName: 'Propietario', // Podríamos obtenerlo del equipo
+                            equipmentName: booking.equipmentName,
+                            otherUserRole: 'arrendador',
+                            otherUserPhone: '+52 55 1234 5678', // Dato simulado
+                          ),
+                        ),
+                      );
+                    },
                     child: Text(tr('Contactar', 'Contact')), // TRADUCCIÓN
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => BookingDetailScreen(booking: booking),
+                        ),
+                      );
+                    },
                     child: Text(tr('Ver detalles', 'View details')), // TRADUCCIÓN
                   ),
                 ),
