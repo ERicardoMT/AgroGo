@@ -5,6 +5,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'globals.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
+import 'screens/landlord_main_screen.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
@@ -36,16 +37,24 @@ class AgroGoApp extends StatelessWidget {
             return ValueListenableBuilder<bool>(
               valueListenable: isLoggedInNotifier,
               builder: (context, isLoggedIn, child) {
-                return MaterialApp(
-                  key: ValueKey('$currentLang-$currentMode-$isLoggedIn'),
-                  title: 'AgroGo',
-                  debugShowCheckedModeBanner: false,
-                  theme: AppTheme.lightTheme,
-                  darkTheme: AppTheme.darkTheme,
-                  themeMode: currentMode,
-                  home: isLoggedIn
-                      ? const MainScreen()
-                      : const LoginScreen(),
+                return ValueListenableBuilder<String>(
+                  valueListenable: userRoleNotifier,
+                  builder: (context, userRole, child) {
+                    return MaterialApp(
+                      key: ValueKey(
+                          '$currentLang-$currentMode-$isLoggedIn-$userRole'),
+                      title: 'AgroGo',
+                      debugShowCheckedModeBanner: false,
+                      theme: AppTheme.lightTheme,
+                      darkTheme: AppTheme.darkTheme,
+                      themeMode: currentMode,
+                      home: isLoggedIn
+                          ? (userRole == 'arrendador'
+                              ? const LandlordMainScreen()
+                              : const MainScreen())
+                          : const LoginScreen(),
+                    );
+                  },
                 );
               },
             );

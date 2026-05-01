@@ -23,6 +23,7 @@ class _LoginScreenState extends State<LoginScreen>
   bool _obscurePassword = true;
   bool _rememberMe = true;
   bool _isLoading = false;
+  String _selectedRole = 'rentador'; // 'rentador' o 'arrendador'
 
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
@@ -85,6 +86,7 @@ class _LoginScreenState extends State<LoginScreen>
     final password = _passwordController.text.trim();
 
     if (email == _demoEmail && password == _demoPassword) {
+      userRoleNotifier.value = _selectedRole;
       isLoggedInNotifier.value = true;
     } else {
       if (!mounted) return;
@@ -329,6 +331,8 @@ class _LoginScreenState extends State<LoginScreen>
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 24),
+            _buildRoleSelector(isDark),
+            const SizedBox(height: 24),
             TextFormField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
@@ -549,6 +553,85 @@ class _LoginScreenState extends State<LoginScreen>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildRoleSelector(bool isDark) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          tr('Selecciona tu rol', 'Select your role'),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.grey[400]
+                    : Colors.grey[600],
+              ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildRoleButton(
+                label: tr('Rentador', 'Renter'),
+                isSelected: _selectedRole == 'rentador',
+                onTap: () {
+                  setState(() => _selectedRole = 'rentador');
+                },
+                isDark: isDark,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildRoleButton(
+                label: tr('Arrendador', 'Landlord'),
+                isSelected: _selectedRole == 'arrendador',
+                onTap: () {
+                  setState(() => _selectedRole = 'arrendador');
+                },
+                isDark: isDark,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoleButton({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.primaryColor
+              : (isDark ? const Color(0xFF2A2A2A) : const Color(0xFFF5F5F5)),
+          borderRadius: BorderRadius.circular(14),
+          border: isSelected
+              ? null
+              : Border.all(
+                  color: isDark ? const Color(0xFF404040) : const Color(0xFFE0E0E0),
+                ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: isSelected
+                      ? Colors.white
+                      : (isDark ? Colors.grey[300] : Colors.grey[700]),
+                ),
+          ),
+        ),
+      ),
     );
   }
 }

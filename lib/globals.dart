@@ -13,6 +13,10 @@ final ValueNotifier<String> languageNotifier = ValueNotifier('Español');
 // solo cambiamos entre LoginScreen y MainScreen desde main.dart.
 final ValueNotifier<bool> isLoggedInNotifier = ValueNotifier(false);
 
+// Control del rol del usuario.
+// 'rentador' para usuarios que rentan, 'arrendador' para propietarios.
+final ValueNotifier<String> userRoleNotifier = ValueNotifier('rentador');
+
 // Traductor global usado por las pantallas actuales.
 String tr(String espanol, String ingles) {
   return languageNotifier.value == 'Español' ? espanol : ingles;
