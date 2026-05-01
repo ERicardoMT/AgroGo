@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../globals.dart';
 import '../theme/app_theme.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -535,16 +536,9 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         TextButton(
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                behavior: SnackBarBehavior.floating,
-                content: Text(
-                  tr(
-                    'Registro pendiente. Primero conecta una base de datos o API.',
-                    'Sign up pending. Connect a database or API first.',
-                  ),
-                ),
-              ),
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const RegisterScreen()),
             );
           },
           child: Text(

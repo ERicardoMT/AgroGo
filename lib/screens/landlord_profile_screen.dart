@@ -6,6 +6,9 @@ import '../globals.dart';
 import 'help_center_screen.dart';
 import 'contact_support_screen.dart';
 import 'terms_conditions_screen.dart';
+import 'banking_details_screen.dart';
+import 'edit_email_screen.dart';
+import 'edit_phone_screen.dart';
 
 class LandlordProfileScreen extends StatefulWidget {
   const LandlordProfileScreen({super.key});
@@ -15,16 +18,16 @@ class LandlordProfileScreen extends StatefulWidget {
 }
 
 class _LandlordProfileData {
-  final String name;
-  final String location;
-  final int totalRentals;
-  final String totalIncome;
-  final double rating;
-  final String email;
-  final String phone;
-  final String registeredSince;
-  final int activeTractors;
-  final int totalReviews;
+  String name;
+  String location;
+  int totalRentals;
+  String totalIncome;
+  double rating;
+  String email;
+  String phone;
+  String registeredSince;
+  int activeTractors;
+  int totalReviews;
 
   _LandlordProfileData({
     required this.name,
@@ -233,6 +236,43 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
     return null;
   }
 
+  void _mostrarDialogoEdicion({
+    required String title,
+    required String initialValue,
+    required Function(String) onSave,
+  }) {
+    final TextEditingController _controller = TextEditingController(text: initialValue);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: _controller,
+            decoration: InputDecoration(
+              hintText: tr('Ingrese nuevo valor', 'Enter new value'),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(tr('Cancelar', 'Cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  onSave(_controller.text);
+                });
+                Navigator.pop(context);
+              },
+              child: Text(tr('Guardar', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -413,18 +453,49 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
                   icon: Icons.person_outline,
                   title: tr('Información Personal', 'Personal Information'),
                   subtitle: landlordData.email,
-                  onTap: () {},
+                  onTap: () async {
+                    final newEmail = await Navigator.push<String>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditEmailScreen(currentEmail: landlordData.email),
+                      ),
+                    );
+                    if (newEmail != null && newEmail.isNotEmpty) {
+                      setState(() {
+                        landlordData.email = newEmail;
+                      });
+                    }
+                  },
                 ),
                 _MenuItem(
                   icon: Icons.phone_outlined,
                   title: tr('Teléfono', 'Phone'),
                   subtitle: landlordData.phone,
-                  onTap: () {},
+                  onTap: () async {
+                    final newPhone = await Navigator.push<String>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditPhoneScreen(currentPhone: landlordData.phone),
+                      ),
+                    );
+                    if (newPhone != null && newPhone.isNotEmpty) {
+                      setState(() {
+                        landlordData.phone = newPhone;
+                      });
+                    }
+                  },
                 ),
                 _MenuItem(
                   icon: Icons.business_outlined,
                   title: tr('Datos Bancarios', 'Banking Details'),
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const BankingDetailsScreen(),
+                      ),
+                    );
+                  },
                 ),
               ]),
               const SizedBox(height: 16),

@@ -127,14 +127,14 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
         type: BottomNavigationBarType.fixed,
         items: [
           BottomNavigationBarItem(
-            icon: const Icon(Icons.dashboard_outlined),
-            activeIcon: const Icon(Icons.dashboard),
-            label: tr('Dashboard', 'Dashboard'),
+            icon: const Icon(Icons.home_outlined),
+            activeIcon: const Icon(Icons.home),
+            label: tr('Inicio', 'Home'),
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.agriculture_outlined),
             activeIcon: const Icon(Icons.agriculture),
-            label: tr('Mis Tractores', 'My Tractors'),
+            label: tr('Mis Rentas', 'My Rentals'),
           ),
           BottomNavigationBarItem(
             icon: const Icon(Icons.inbox_outlined),
