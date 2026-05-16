@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import '../theme/app_theme.dart';
 import '../globals.dart';
+import '../data/database_helper.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -37,23 +39,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
     
-    setState(() => _isLoading = true);
-    
-    // Simulación de registro
-    await Future.delayed(const Duration(seconds: 1));
-    
-    if (mounted) {
-      setState(() => _isLoading = false);
+    // Verificar que las contraseñas coincidan
+    if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.green,
-          content: Text(
-            tr('Usuario registrado con éxito', 'User registered successfully'),
-          ),
+          backgroundColor: Colors.red,
+          content: Text(tr('Las contraseñas no coinciden', 'Passwords do not match')),
         ),
       );
-      Navigator.pop(context); // Volver al inicio de sesión
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    
+    // Preparar los datos del usuario
+    final dbHelper = DatabaseHelper();
+    final uuid = const Uuid().v4();
+    
+    final userData = {
+      'id': uuid,
+      'name': _nameController.text.trim(),
+      'email': _emailController.text.trim().toLowerCase(),
+      'phone': _phoneController.text.trim(),
+      'password': _passwordController.text, // En un modelo real de prod debes cifrarla (ej. bcrypt)
+      'role': _selectedRole,
+      'location': 'Sin definir',
+      'favorites': '[]',
+      'createdAt': DateTime.now().toIso8601String(),
+    };
+
+    // Intentar registrar en base de datos
+    final success = await dbHelper.registerUser(userData);
+
+    // Para ver en consola
+    await dbHelper.printTableData('users');
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+            content: Text(
+              tr('Usuario registrado con éxito', 'User registered successfully'),
+            ),
+          ),
+        );
+        Navigator.pop(context); // Volver al inicio de sesión
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.red,
+            content: Text(
+              tr('Error: El correo ya está registrado', 'Error: Email already exists'),
+            ),
+          ),
+        );
+      }
     }
   }
 

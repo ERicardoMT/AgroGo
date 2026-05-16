@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../globals.dart';
 import '../theme/app_theme.dart';
+import '../data/database_helper.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -79,16 +80,18 @@ class _LoginScreenState extends State<LoginScreen>
 
     setState(() => _isLoading = true);
 
-    // Simulación realista de autenticación.
-    // Cuando conecten backend/Firebase/API, este bloque se reemplaza por la llamada HTTP.
-    await Future.delayed(const Duration(milliseconds: 750));
-
     final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text.trim();
 
-    if (email == _demoEmail && password == _demoPassword) {
+    // Verificación contra la base de datos (SQLite)
+    final dbHelper = DatabaseHelper();
+    final user = await dbHelper.loginUser(email, password, _selectedRole);
+
+    if (user != null) {
+      // Guardar información global o local (por ahora en tus variables Notifier)
       userRoleNotifier.value = _selectedRole;
       isLoggedInNotifier.value = true;
+      // Podrías usar SharedPreferences si deseas que perdure (ej: "remember me")
     } else {
       if (!mounted) return;
 
@@ -98,8 +101,8 @@ class _LoginScreenState extends State<LoginScreen>
           backgroundColor: AppTheme.errorColor,
           content: Text(
             tr(
-              'Correo o contraseña incorrectos. Usa la cuenta demo.',
-              'Wrong email or password. Use the demo account.',
+              'Credenciales o rol incorrectos. Inténtalo de nuevo o regístrate.',
+              'Wrong credentials or role. Try again or register.',
             ),
           ),
         ),
