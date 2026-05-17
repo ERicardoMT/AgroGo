@@ -35,6 +35,7 @@ class _MainScreenState extends State<MainScreen> {
       HomeScreen(
         favoriteIds: _favoriteIds,
         onToggleFavorite: _toggleFavorite,
+        onSearchTap: () => setState(() => _currentIndex = 1), // NAVEGACIÓN DESDE HOME
       ),
       const SearchScreen(),
       const BookingsScreen(),

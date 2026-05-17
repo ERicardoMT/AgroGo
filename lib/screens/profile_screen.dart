@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../data/mock_data.dart';
 import '../theme/app_theme.dart';
 import 'personal_info_screen.dart';
-import '../globals.dart'; // <--- Importamos los megáfonos globales
+import '../globals.dart'; 
 import 'help_center_screen.dart';
 import 'contact_support_screen.dart';
 import 'terms_conditions_screen.dart';
@@ -302,12 +302,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               _MenuItem(
                 icon: Icons.notifications_outlined,
                 title: tr('Notificaciones', 'Notifications'),
-                trailing: Switch(
-                  value: true,
-                  onChanged: (value) {},
-                  activeColor: AppTheme.primaryColor,
+                trailing: ValueListenableBuilder<bool>(
+                  valueListenable: notificationsNotifier,
+                  builder: (context, isEnabled, child) {
+                    return Switch(
+                      value: isEnabled,
+                      onChanged: (value) {
+                        notificationsNotifier.value = value;
+                      },
+                      activeColor: AppTheme.primaryColor,
+                    );
+                  },
                 ),
-                onTap: () {},
+                onTap: () {
+                  notificationsNotifier.value = !notificationsNotifier.value;
+                },
               ),
               _MenuItem(
                 icon: Icons.language_outlined,
@@ -352,7 +361,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   );
                 },
               ),
-
               _MenuItem(
                 icon: Icons.chat_outlined,
                 title: tr('Contactar soporte', 'Contact Support'),
@@ -362,22 +370,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     MaterialPageRoute(
                       builder: (context) => const ContactSupportScreen(),
                     ),
-                );
-              },
-            ),
-  _MenuItem(
-    icon: Icons.description_outlined,
-    title: tr('Términos y condiciones', 'Terms & Conditions'),
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const TermsConditionsScreen(),
-        ),
-      );
-    },
-  ),
-]),
+                  );
+                },
+              ),
+              _MenuItem(
+                icon: Icons.description_outlined,
+                title: tr('Términos y condiciones', 'Terms & Conditions'),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const TermsConditionsScreen(),
+                    ),
+                  );
+                },
+              ),
+            ]),
 
             const SizedBox(height: 24),
 
@@ -386,7 +394,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: OutlinedButton.icon(
                 onPressed: () {
                   isLoggedInNotifier.value = false;
-                  },
+                },
                 icon: const Icon(Icons.logout, color: AppTheme.errorColor),
                 label: Text(
                   tr('Cerrar sesión', 'Log out'),

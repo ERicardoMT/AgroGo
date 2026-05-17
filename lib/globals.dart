@@ -11,11 +11,13 @@ final ValueNotifier<String> languageNotifier = ValueNotifier('Español');
 // Control simple de sesión.
 // Optimización de flujo: con este notifier no recreamos toda la arquitectura;
 // solo cambiamos entre LoginScreen y MainScreen desde main.dart.
-final ValueNotifier<bool> isLoggedInNotifier = ValueNotifier(false);
+final ValueNotifier<bool> isLoggedInNotifier = ValueNotifier(true);
 
 // Control del rol del usuario.
 // 'rentador' para usuarios que rentan, 'arrendador' para propietarios.
 final ValueNotifier<String> userRoleNotifier = ValueNotifier('rentador');
+final ValueNotifier<bool> notificationsNotifier = ValueNotifier(true);
+
 
 // Traductor global usado por las pantallas actuales.
 String tr(String espanol, String ingles) {
