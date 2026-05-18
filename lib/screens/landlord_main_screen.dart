@@ -10,6 +10,8 @@ import 'rental_requests_screen.dart';
 import 'finances_screen.dart';
 import 'communication_screen.dart';
 import 'landlord_profile_screen.dart';
+import 'notifications_screen.dart'; // <--- IMPORT
+import '../data/database_helper.dart'; // <-- IMPORT MBD
 
 class LandlordMainScreen extends StatefulWidget {
   const LandlordMainScreen({super.key});
@@ -27,10 +29,38 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
   late MonthlyIncome monthlyIncome;
   late List<LandlordAlert> criticalAlerts;
 
+  String _userName = ''; // <--- Agregamos variable para el nombre real
+
   @override
   void initState() {
     super.initState();
     _loadMockData();
+    _loadUserName(); // <--- Cargamos nombre desde BD
+  }
+
+  Future<void> _loadUserName() async {
+    final dbHelper = DatabaseHelper();
+    final users = await dbHelper.getAll('users');
+    final currentEmail = currentUserEmailNotifier.value;
+
+    if (users.isNotEmpty && currentEmail != null) {
+      try {
+        final miUsuario = users.firstWhere((user) => user['email'] == currentEmail);
+        setState(() {
+          // Extraemos solo el primer nombre en caso de que escriban todo el nombre completo
+          final fullName = miUsuario['name']?.toString() ?? 'Usuario';
+          _userName = fullName.split(' ')[0];
+        });
+      } catch (e) {
+        setState(() {
+          _userName = 'Usuario';
+        });
+      }
+    } else {
+      setState(() {
+        _userName = 'Usuario';
+      });
+    }
   }
 
   void _loadMockData() {
@@ -196,13 +226,10 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
       actions: [
         IconButton(
           onPressed: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                behavior: SnackBarBehavior.floating,
-                content: Text(
-                  tr('Notificaciones pendiente de backend',
-                      'Notifications pending backend'),
-                ),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const NotificationsScreen(),
               ),
             );
           },
@@ -229,7 +256,8 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          tr('Bienvenido, Carlos', 'Welcome, Carlos'),
+          // --- AQUÍ USAMOS EL NOMBRE REAL DEL USUARIO ---
+          tr('Bienvenido, $_userName', 'Welcome, $_userName'),
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w800,
               ),

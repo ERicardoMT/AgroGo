@@ -15,12 +15,8 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
 
-  final _emailController = TextEditingController(
-    text: 'carlos.mendoza@email.com',
-  );
-  final _passwordController = TextEditingController(
-    text: 'agrogo123',
-  );
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
   bool _rememberMe = true;
@@ -30,9 +26,6 @@ class _LoginScreenState extends State<LoginScreen>
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
   late final Animation<Offset> _slideAnimation;
-
-  static const String _demoEmail = 'carlos.mendoza@email.com';
-  static const String _demoPassword = 'agrogo123';
 
   @override
   void initState() {
@@ -90,6 +83,7 @@ class _LoginScreenState extends State<LoginScreen>
     if (user != null) {
       // Guardar información global o local (por ahora en tus variables Notifier)
       userRoleNotifier.value = _selectedRole;
+      currentUserEmailNotifier.value = email; // <-- GUARDAMOS EL CORREO DEL USUARIO LOGUEADO
       isLoggedInNotifier.value = true;
       // Podrías usar SharedPreferences si deseas que perdure (ej: "remember me")
     } else {
@@ -112,23 +106,6 @@ class _LoginScreenState extends State<LoginScreen>
     if (mounted) {
       setState(() => _isLoading = false);
     }
-  }
-
-  void _fillDemoCredentials() {
-    _emailController.text = _demoEmail;
-    _passwordController.text = _demoPassword;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text(
-          tr(
-            'Credenciales demo cargadas.',
-            'Demo credentials loaded.',
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -475,57 +452,8 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _isLoading ? null : _fillDemoCredentials,
-                icon: const Icon(Icons.auto_fix_high_rounded),
-                label: Text(
-                  tr('Usar cuenta demo', 'Use demo account'),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            _buildDemoAccessNote(isDark),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDemoAccessNote(bool isDark) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.primaryColor.withOpacity(isDark ? 0.16 : 0.08),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: AppTheme.primaryColor.withOpacity(isDark ? 0.24 : 0.14),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.info_outline_rounded,
-            color: isDark ? AppTheme.primaryLight : AppTheme.primaryColor,
-            size: 22,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              tr(
-                'Demo: carlos.mendoza@email.com / agrogo123',
-                'Demo: carlos.mendoza@email.com / agrogo123',
-              ),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    height: 1.35,
-                  ),
-            ),
-          ),
-        ],
       ),
     );
   }

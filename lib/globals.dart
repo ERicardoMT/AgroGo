@@ -11,11 +11,15 @@ final ValueNotifier<String> languageNotifier = ValueNotifier('Español');
 // Control simple de sesión.
 // Optimización de flujo: con este notifier no recreamos toda la arquitectura;
 // solo cambiamos entre LoginScreen y MainScreen desde main.dart.
-final ValueNotifier<bool> isLoggedInNotifier = ValueNotifier(true);
+final ValueNotifier<bool> isLoggedInNotifier = ValueNotifier(false);
 
 // Control del rol del usuario.
 // 'rentador' para usuarios que rentan, 'arrendador' para propietarios.
 final ValueNotifier<String> userRoleNotifier = ValueNotifier('rentador');
+
+// ID o Email del usuario que tiene la sesión activa.
+final ValueNotifier<String?> currentUserEmailNotifier = ValueNotifier(null);
+
 final ValueNotifier<bool> notificationsNotifier = ValueNotifier(true);
 
 

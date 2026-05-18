@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../globals.dart';
+import '../data/database_helper.dart'; // <-- IMPORT MBD
 
 class BankingDetailsScreen extends StatefulWidget {
   const BankingDetailsScreen({super.key});
@@ -11,12 +12,44 @@ class BankingDetailsScreen extends StatefulWidget {
 
 class _BankingDetailsScreenState extends State<BankingDetailsScreen> {
   final _formKey = GlobalKey<FormState>();
+  bool _isLoading = true; // <-- Estado de carga
   
-  // Controladores para los campos de datos bancarios
-  final TextEditingController _titularController = TextEditingController(text: 'Carlos Rodríguez López');
-  final TextEditingController _bancoController = TextEditingController(text: 'Banco Santander');
-  final TextEditingController _ibanController = TextEditingController(text: 'ES91 1234 5678 9012 3456 7890');
-  final TextEditingController _swiftController = TextEditingController(text: 'BSCHESMM');
+  // Controladores para los campos de datos bancarios (inicialmente vacíos)
+  final TextEditingController _titularController = TextEditingController();
+  final TextEditingController _bancoController = TextEditingController();
+  final TextEditingController _ibanController = TextEditingController();
+  final TextEditingController _swiftController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBankingDetails();
+  }
+
+  Future<void> _loadBankingDetails() async {
+    final dbHelper = DatabaseHelper();
+    final currentEmail = currentUserEmailNotifier.value;
+
+    if (currentEmail != null) {
+      final allAccounts = await dbHelper.getAll('bank_accounts');
+      try {
+        // Buscamos si este usuario ya tiene una cuenta (usaremos su email como ID para relacionarlo)
+        final myAccount = allAccounts.firstWhere((acc) => acc['id'] == "bank_$currentEmail");
+        setState(() {
+          _titularController.text = myAccount['accountHolder']?.toString() ?? '';
+          _bancoController.text = myAccount['bankName']?.toString() ?? '';
+          _ibanController.text = myAccount['iban']?.toString() ?? '';
+          _swiftController.text = myAccount['swiftCode']?.toString() ?? '';
+        });
+      } catch (e) {
+        // No tiene cuenta registrada, los campos se quedan vacíos
+      }
+    }
+    
+    setState(() {
+      _isLoading = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -27,9 +60,32 @@ class _BankingDetailsScreenState extends State<BankingDetailsScreen> {
     super.dispose();
   }
 
-  void _guardarCambios() {
+  void _guardarCambios() async {
     if (_formKey.currentState!.validate()) {
-      // Aquí iría la lógica para guardar los datos en backend/base de datos
+      final currentEmail = currentUserEmailNotifier.value;
+      if (currentEmail == null) return;
+
+      final dbHelper = DatabaseHelper();
+      
+      // Creamos el mapa de datos que coincida las columnas de SQLite
+      final accountData = {
+        'id': 'bank_$currentEmail', // Usamos el correo como base para enlazarlo con el usuario
+        'accountHolder': _titularController.text.trim(),
+        'bankName': _bancoController.text.trim(),
+        'accountNumber': _ibanController.text.trim(), // Lo usamos como IBAN/Cuenta
+        'accountType': 'checking', // Por defecto
+        'swiftCode': _swiftController.text.trim(),
+        'iban': _ibanController.text.trim(),
+        'isDefault': 1,
+        'createdAt': DateTime.now().toIso8601String(),
+        'documentUrl': '',
+      };
+
+      // Inserción en la base de datos local (reemplazará si ya existe con esa ID)
+      await dbHelper.insert('bank_accounts', accountData);
+
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(tr('Datos bancarios guardados con éxito', 'Banking details saved successfully')),
@@ -60,7 +116,9 @@ class _BankingDetailsScreenState extends State<BankingDetailsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: SafeArea(
+      body: _isLoading 
+        ? const Center(child: CircularProgressIndicator()) 
+        : SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
           child: Form(

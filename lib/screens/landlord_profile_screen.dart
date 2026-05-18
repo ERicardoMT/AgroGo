@@ -9,6 +9,7 @@ import 'terms_conditions_screen.dart';
 import 'banking_details_screen.dart';
 import 'edit_email_screen.dart';
 import 'edit_phone_screen.dart';
+import '../data/database_helper.dart';
 
 class LandlordProfileScreen extends StatefulWidget {
   const LandlordProfileScreen({super.key});
@@ -57,24 +58,55 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
     'https://api.dicebear.com/7.x/fun-emoji/png?seed=Rentador',
   ];
 
-  // Datos del arrendador
-  late _LandlordProfileData landlordData;
+  _LandlordProfileData? landlordData; // Cambia a opcional (?) y quita 'late'
+  bool isLoading = true; // Variable para la pantalla de carga
 
   @override
   void initState() {
     super.initState();
-    landlordData = _LandlordProfileData(
-      name: 'Carlos Rodríguez López',
-      location: 'Castilla y León, España',
-      totalRentals: 47,
-      totalIncome: '\$12,450.50',
-      rating: 4.8,
-      email: 'carlos.rodriguez@agrogo.com',
-      phone: '+34 923 456 789',
-      registeredSince: '2022',
-      activeTractors: 12,
-      totalReviews: 89,
-    );
+    _loadUserFromDB();
+  }
+
+  Future<void> _loadUserFromDB() async {
+    final dbHelper = DatabaseHelper();
+    // Obtienes todos los usuarios (o deberías pasar el ID / Email del que inició sesión)
+    final users = await dbHelper.getAll('users');
+    
+    // Obtenemos el correo del usuario actual (o nulo si no hay nadie)
+    final currentEmail = currentUserEmailNotifier.value;
+
+    if (users.isNotEmpty && currentEmail != null) {
+      try {
+        final miUsuario = users.firstWhere((user) => user['email'] == currentEmail);
+        
+        setState(() {
+          landlordData = _LandlordProfileData(
+            // Trata de mapear las columnas reales de la base de datos.
+            name: miUsuario['name']?.toString() ?? 'Usuario Sin Nombre',
+            location: miUsuario['location']?.toString() ?? 'Sin Ubicación',
+            email: miUsuario['email']?.toString() ?? 'Sin Correo',
+            phone: miUsuario['phone']?.toString() ?? 'Sin Teléfono',
+            totalRentals: 0,
+            totalIncome: '\$0.00',
+            rating: 0.0,
+            registeredSince: miUsuario['createdAt']?.toString().substring(0,4) ?? '2024',
+            activeTractors: 0,
+            totalReviews: 0,
+          );
+          isLoading = false;
+        });
+      } catch (e) {
+        // En caso de que firstWhere no encuentre el usuario
+        setState(() {
+          isLoading = false;
+        });
+      }
+    } else {
+      // Si la base de datos de Windows está vacía, o no hay email guardado, caerá aquí
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -275,6 +307,14 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (landlordData == null) {
+      return const Scaffold(body: Center(child: Text("No se encontró ningún usuario.")));
+    }
+
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -318,7 +358,7 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
                             child: _imageFile == null &&
                                     _illustrationUrl == null
                                 ? Text(
-                                    landlordData.name
+                                    landlordData!.name
                                         .split(' ')
                                         .map((n) => n[0])
                                         .take(2)
@@ -345,7 +385,7 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      landlordData.name,
+                      landlordData!.name,
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 4),
@@ -359,7 +399,7 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          landlordData.location,
+                          landlordData!.location,
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ],
@@ -369,7 +409,7 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         _buildStat(context,
-                            landlordData.totalRentals.toString(),
+                            landlordData!.totalRentals.toString(),
                             tr('Rentas', 'Rentals')),
                         Container(
                           width: 1,
@@ -377,14 +417,14 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
                           color: AppTheme.borderColor,
                         ),
                         _buildStat(context,
-                            landlordData.activeTractors.toString(),
+                            landlordData!.activeTractors.toString(),
                             tr('Tractores', 'Tractors')),
                         Container(
                           width: 1,
                           height: 40,
                           color: AppTheme.borderColor,
                         ),
-                        _buildStat(context, landlordData.rating.toString(),
+                        _buildStat(context, landlordData!.rating.toString(),
                             tr('Calificación', 'Rating')),
                       ],
                     ),
@@ -421,7 +461,7 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
                                     ?.copyWith(fontSize: 11),
                               ),
                               Text(
-                                landlordData.totalIncome,
+                                landlordData!.totalIncome,
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
@@ -433,7 +473,7 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
                           ),
                         ),
                         Text(
-                          'ID: #${landlordData.registeredSince}',
+                          'ID: #${landlordData!.registeredSince}',
                           style:
                               Theme.of(context).textTheme.labelSmall?.copyWith(
                                     fontSize: 10,
@@ -452,17 +492,17 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
                 _MenuItem(
                   icon: Icons.person_outline,
                   title: tr('Información Personal', 'Personal Information'),
-                  subtitle: landlordData.email,
+                  subtitle: landlordData!.email,
                   onTap: () async {
                     final newEmail = await Navigator.push<String>(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => EditEmailScreen(currentEmail: landlordData.email),
+                        builder: (context) => EditEmailScreen(currentEmail: landlordData!.email),
                       ),
                     );
                     if (newEmail != null && newEmail.isNotEmpty) {
                       setState(() {
-                        landlordData.email = newEmail;
+                        landlordData!.email = newEmail;
                       });
                     }
                   },
@@ -470,17 +510,17 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
                 _MenuItem(
                   icon: Icons.phone_outlined,
                   title: tr('Teléfono', 'Phone'),
-                  subtitle: landlordData.phone,
+                  subtitle: landlordData!.phone,
                   onTap: () async {
                     final newPhone = await Navigator.push<String>(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => EditPhoneScreen(currentPhone: landlordData.phone),
+                        builder: (context) => EditPhoneScreen(currentPhone: landlordData!.phone),
                       ),
                     );
                     if (newPhone != null && newPhone.isNotEmpty) {
                       setState(() {
-                        landlordData.phone = newPhone;
+                        landlordData!.phone = newPhone;
                       });
                     }
                   },

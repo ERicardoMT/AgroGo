@@ -3,6 +3,8 @@ import '../globals.dart';
 import '../theme/app_theme.dart';
 import '../models/transaction.dart';
 import '../models/bank_account.dart';
+import '../data/database_helper.dart'; // <-- IMPORT MBD
+import 'banking_details_screen.dart'; // <-- IMPORT BANKING DETAILS SCREEN TO NAVIGATE
 
 class FinancesScreen extends StatefulWidget {
   const FinancesScreen({super.key});
@@ -14,14 +16,53 @@ class FinancesScreen extends StatefulWidget {
 class _FinancesScreenState extends State<FinancesScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  late List<Transaction> transactions;
-  late List<BankAccount> bankAccounts;
+  List<Transaction> transactions = [];
+  List<BankAccount> bankAccounts = [];
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadMockData();
+    _loadAllData();
+  }
+
+  Future<void> _loadAllData() async {
+    _loadMockData(); // Cargamos transacciones de mentira
+    await _loadRealBankAccounts(); // Cargamos cuentas bancarias de la BD
+    setState(() {
+      isLoading = false; // Detenemos la carga y dibujamos la pantalla
+    });
+  }
+
+  Future<void> _loadRealBankAccounts() async {
+    final dbHelper = DatabaseHelper();
+    final allAccounts = await dbHelper.getAll('bank_accounts');
+    final currentEmail = currentUserEmailNotifier.value;
+    
+    bankAccounts = []; // Limpiamos la lista 
+
+    if (currentEmail != null && allAccounts.isNotEmpty) {
+      try {
+        final miCuentaData = allAccounts.firstWhere((acc) => acc['id'] == "bank_$currentEmail");
+        
+        bankAccounts.add(
+          BankAccount(
+            id: miCuentaData['id'].toString(),
+            accountHolder: miCuentaData['accountHolder'].toString(),
+            bankName: miCuentaData['bankName'].toString(),
+            accountNumber: miCuentaData['accountNumber'].toString(),
+            accountType: miCuentaData['accountType'].toString(),
+            swiftCode: miCuentaData['swiftCode']?.toString(),
+            iban: miCuentaData['iban']?.toString(),
+            isDefault: miCuentaData['isDefault'] == 1,
+            createdAt: DateTime.tryParse(miCuentaData['createdAt'].toString()) ?? DateTime.now(),
+          )
+        );
+      } catch (e) {
+        // El usuario no tiene cuenta registrada
+      }
+    }
   }
 
   @override
@@ -96,24 +137,15 @@ class _FinancesScreenState extends State<FinancesScreen>
         status: 'completed',
       ),
     ];
-
-    bankAccounts = [
-      BankAccount(
-        id: 'BA001',
-        accountHolder: 'Arrendador Agrícola',
-        bankName: 'Banco Popular',
-        accountNumber: '1234567890123456',
-        accountType: 'Checking',
-        swiftCode: 'BPOPXXX',
-        iban: 'ES9121000418450200051332',
-        isDefault: true,
-        createdAt: DateTime.now().subtract(const Duration(days: 90)),
-      ),
-    ];
+    // Las cuentas de banco ahora se cargan de `_loadRealBankAccounts()`
   }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -428,7 +460,16 @@ class _FinancesScreenState extends State<FinancesScreen>
               label: Text(tr('Retirar', 'Withdraw')),
             ),
             OutlinedButton.icon(
-              onPressed: () => _showAddBankAccountDialog(isDark),
+              onPressed: () async {
+                // Al volver, recargamos la info por si agregó cuenta
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const BankingDetailsScreen()),
+                );
+                setState(() { isLoading = true; });
+                await _loadRealBankAccounts();
+                setState(() { isLoading = false; });
+              },
               icon: const Icon(Icons.add_rounded),
               label: Text(tr('Agregar Método', 'Add Method')),
             ),
@@ -579,12 +620,14 @@ class _FinancesScreenState extends State<FinancesScreen>
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(tr('Editar cuenta', 'Edit account')),
-                      ),
-                    );
+                  onPressed: () async {
+                     await Navigator.push(
+                       context,
+                       MaterialPageRoute(builder: (context) => const BankingDetailsScreen()),
+                     );
+                     setState(() { isLoading = true; });
+                     await _loadRealBankAccounts();
+                     setState(() { isLoading = false; });
                   },
                   icon: const Icon(Icons.edit_outlined, size: 16),
                   label: Text(
