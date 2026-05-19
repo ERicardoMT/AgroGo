@@ -10,8 +10,8 @@ import 'rental_requests_screen.dart';
 import 'finances_screen.dart';
 import 'communication_screen.dart';
 import 'landlord_profile_screen.dart';
-import 'notifications_screen.dart'; // <--- IMPORT
-import '../data/database_helper.dart'; // <-- IMPORT MBD
+import 'notifications_screen.dart'; 
+import '../data/database_helper.dart'; 
 
 class LandlordMainScreen extends StatefulWidget {
   const LandlordMainScreen({super.key});
@@ -22,22 +22,35 @@ class LandlordMainScreen extends StatefulWidget {
 
 class _LandlordMainScreenState extends State<LandlordMainScreen> {
   int _currentTabIndex = 0;
+  bool _isLoading = true; // <--- Agregamos estado de carga
 
-  // Mock data
+  // Variables para los datos
   late List<RentalRequest> pendingRequests;
   late FleetStatus fleetStatus;
   late MonthlyIncome monthlyIncome;
   late List<LandlordAlert> criticalAlerts;
 
-  String _userName = ''; // <--- Agregamos variable para el nombre real
+  String _userName = '';
 
   @override
   void initState() {
     super.initState();
-    _loadMockData();
-    _loadUserName(); // <--- Cargamos nombre desde BD
+    // En lugar de cargar mock data directo, inicializamos todo de forma asíncrona
+    _initializeData();
   }
 
+  // --- INICIALIZACIÓN GENERAL ---
+  Future<void> _initializeData() async {
+    await _loadUserName();
+    await _loadDataFromDB(); // <--- Carga desde SQLite
+    if (mounted) {
+      setState(() {
+        _isLoading = false; // Oculta el spinner de carga
+      });
+    }
+  }
+
+  // --- 1. CARGAMOS EL USUARIO ---
   Future<void> _loadUserName() async {
     final dbHelper = DatabaseHelper();
     final users = await dbHelper.getAll('users');
@@ -47,96 +60,142 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
       try {
         final miUsuario = users.firstWhere((user) => user['email'] == currentEmail);
         setState(() {
-          // Extraemos solo el primer nombre en caso de que escriban todo el nombre completo
           final fullName = miUsuario['name']?.toString() ?? 'Usuario';
           _userName = fullName.split(' ')[0];
         });
       } catch (e) {
-        setState(() {
-          _userName = 'Usuario';
-        });
+        setState(() => _userName = 'Usuario');
       }
     } else {
-      setState(() {
-        _userName = 'Usuario';
-      });
+      setState(() => _userName = 'Usuario');
     }
   }
 
-  void _loadMockData() {
-    // Solicitudes pendientes
+  // --- 2. CARGAMOS LOS DATOS REALES DE SQLITE ---
+  Future<void> _loadDataFromDB() async {
+    final dbHelper = DatabaseHelper();
+    final db = await dbHelper.database;
+
+    try {
+      // A) Buscar Solicitudes Pendientes
+      final reqResult = await db.query('rental_requests', where: 'status = ?', whereArgs: ['pending']);
+      if (reqResult.isNotEmpty) {
+        pendingRequests = reqResult.map((map) => RentalRequest(
+          id: map['id'].toString(),
+          rentalId: map['rentalId'].toString(),
+          equipmentName: map['equipmentName'].toString(),
+          renterName: map['renterName'].toString(),
+          renterPhone: map['renterPhone'].toString(),
+          renterLocation: map['renterLocation'].toString(),
+          requestDate: DateTime.parse(map['requestDate'].toString()),
+          startDate: DateTime.parse(map['startDate'].toString()),
+          endDate: DateTime.parse(map['endDate'].toString()),
+          status: map['status'].toString(),
+          dailyRate: (map['dailyRate'] as num).toDouble(),
+        )).toList();
+      } else {
+        _loadMockPendingRequests(); // Fallback si no hay datos
+      }
+
+      // B) Calcular el estado de la flota
+      final equipResult = await db.query('landlord_equipments');
+      if (equipResult.isNotEmpty) {
+        int available = 0;
+        for (var eq in equipResult) {
+          if (eq['isActive'] == 1) available++;
+        }
+        fleetStatus = FleetStatus(
+          totalEquipment: equipResult.length,
+          rented: equipResult.length - available, // Simplificado
+          available: available,
+          maintenance: 0,
+        );
+      } else {
+        _loadMockFleetStatus(); // Fallback si no hay equipos
+      }
+
+      // C) Buscar Alertas Críticas
+      final alertsResult = await db.query('landlord_alerts', orderBy: 'createdAt DESC', limit: 2);
+      if (alertsResult.isNotEmpty) {
+        criticalAlerts = alertsResult.map((map) => LandlordAlert(
+          id: map['id'].toString(),
+          title: map['title'].toString(),
+          message: map['message'].toString(),
+          type: map['type'].toString(),
+          createdAt: DateTime.parse(map['createdAt'].toString()),
+          rentalId: map['rentalId']?.toString(),
+          equipmentId: map['equipmentId']?.toString(),
+        )).toList();
+      } else {
+        _loadMockAlerts(); // Fallback
+      }
+
+      // D) Buscar Ingresos Mensuales (Simulado hasta conectar con tabla transactions)
+      _loadMockIncome();
+
+    } catch (e) {
+      print("Error cargando BD: $e");
+      // Si ocurre un error, no rompemos la app, cargamos datos falsos
+      _loadMockPendingRequests();
+      _loadMockFleetStatus();
+      _loadMockAlerts();
+      _loadMockIncome();
+    }
+  }
+
+  // --- MÉTODOS DE RESPALDO (MOCK DATA) ---
+  void _loadMockPendingRequests() {
     pendingRequests = [
       RentalRequest(
-        id: '1',
-        rentalId: 'R001',
-        equipmentName: 'Tractor John Deere 5075E',
-        renterName: 'Juan Pérez',
-        renterPhone: '+34 912 345 678',
-        renterLocation: 'Valladolid, España',
+        id: '1', rentalId: 'R001', equipmentName: 'Tractor John Deere 5075E',
+        renterName: 'Juan Pérez', renterPhone: '+34 912 345 678', renterLocation: 'Valladolid, España',
         requestDate: DateTime.now().subtract(const Duration(hours: 3)),
         startDate: DateTime.now().add(const Duration(days: 2)),
         endDate: DateTime.now().add(const Duration(days: 5)),
-        status: 'pending',
-        dailyRate: 150.0,
+        status: 'pending', dailyRate: 150.0,
       ),
       RentalRequest(
-        id: '2',
-        rentalId: 'R002',
-        equipmentName: 'Cosechadora CLAAS',
-        renterName: 'María García',
-        renterPhone: '+34 923 456 789',
-        renterLocation: 'Palencia, España',
+        id: '2', rentalId: 'R002', equipmentName: 'Cosechadora CLAAS',
+        renterName: 'María García', renterPhone: '+34 923 456 789', renterLocation: 'Palencia, España',
         requestDate: DateTime.now().subtract(const Duration(hours: 1)),
         startDate: DateTime.now().add(const Duration(days: 1)),
         endDate: DateTime.now().add(const Duration(days: 3)),
-        status: 'pending',
-        dailyRate: 280.0,
-      ),
-    ];
-
-    // Estado de flota
-    fleetStatus = FleetStatus(
-      totalEquipment: 6,
-      rented: 3,
-      available: 2,
-      maintenance: 1,
-    );
-
-    // Ingresos del mes
-    monthlyIncome = MonthlyIncome(
-      totalIncome: 3450.00,
-      pendingPayments: 850.00,
-      completedPayments: 2600.00,
-      rentalsCompleted: 8,
-      periodStart: DateTime(DateTime.now().year, DateTime.now().month, 1),
-      periodEnd: DateTime.now(),
-    );
-
-    // Alertas críticas
-    criticalAlerts = [
-      LandlordAlert(
-        id: 'A1',
-        title: 'Renta atrasada',
-        message: 'Tractor rentado por Carlos hace 2 horas. Debe ser devuelto en 30 min.',
-        type: 'critical',
-        createdAt: DateTime.now().subtract(const Duration(minutes: 30)),
-        rentalId: 'R003',
-      ),
-      LandlordAlert(
-        id: 'A2',
-        title: 'Mantenimiento programado',
-        message: 'La cosechadora requiere mantenimiento mañana a las 9:00 AM.',
-        type: 'warning',
-        createdAt: DateTime.now().subtract(const Duration(hours: 2)),
-        equipmentId: 'E002',
+        status: 'pending', dailyRate: 280.0,
       ),
     ];
   }
 
+  void _loadMockFleetStatus() {
+    fleetStatus = FleetStatus(totalEquipment: 6, rented: 3, available: 2, maintenance: 1);
+  }
+
+  void _loadMockIncome() {
+    monthlyIncome = MonthlyIncome(
+      totalIncome: 3450.00, pendingPayments: 850.00, completedPayments: 2600.00,
+      rentalsCompleted: 8, periodStart: DateTime(DateTime.now().year, DateTime.now().month, 1),
+      periodEnd: DateTime.now(),
+    );
+  }
+
+  void _loadMockAlerts() {
+    criticalAlerts = [
+      LandlordAlert(
+        id: 'A1', title: 'Renta atrasada', message: 'Tractor rentado por Carlos hace 2 horas. Debe ser devuelto en 30 min.',
+        type: 'critical', createdAt: DateTime.now().subtract(const Duration(minutes: 30)), rentalId: 'R003',
+      ),
+      LandlordAlert(
+        id: 'A2', title: 'Mantenimiento programado', message: 'La cosechadora requiere mantenimiento mañana a las 9:00 AM.',
+        type: 'warning', createdAt: DateTime.now().subtract(const Duration(hours: 2)), equipmentId: 'E002',
+      ),
+    ];
+  }
+
+
+  // --- INTERFAZ VISUAL ---
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
+    
     final screens = [
       _buildDashboardTab(isDark),
       const FleetManagementScreen(),
@@ -187,6 +246,15 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
   }
 
   Widget _buildDashboardTab(bool isDark) {
+    // Si la base de datos está cargando, mostramos la ruedita
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFFAFAFA),
+        appBar: _buildAppBar(isDark),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFFAFAFA),
       appBar: _buildAppBar(isDark),
@@ -256,7 +324,6 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          // --- AQUÍ USAMOS EL NOMBRE REAL DEL USUARIO ---
           tr('Bienvenido, $_userName', 'Welcome, $_userName'),
           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w800,
@@ -278,7 +345,6 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
 
   Widget _buildCriticalAlerts(bool isDark) {
     if (criticalAlerts.isEmpty) return const SizedBox.shrink();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -670,7 +736,6 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
 
   Widget _buildRequestCard(RentalRequest request, bool isDark) {
     final daysLeft = request.startDate.difference(DateTime.now()).inDays;
-
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),

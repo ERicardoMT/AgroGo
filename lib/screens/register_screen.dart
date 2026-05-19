@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; 
 import 'package:uuid/uuid.dart';
 import '../theme/app_theme.dart';
 import '../globals.dart';
@@ -13,7 +14,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  String _selectedRole = 'rentador'; // 'rentador' o 'arrendador'
+  String _selectedRole = 'rentador'; 
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _isLoading = false;
@@ -52,17 +53,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     setState(() => _isLoading = true);
-    
+
     // Preparar los datos del usuario
     final dbHelper = DatabaseHelper();
     final uuid = const Uuid().v4();
-    
+
     final userData = {
       'id': uuid,
       'name': _nameController.text.trim(),
       'email': _emailController.text.trim().toLowerCase(),
       'phone': _phoneController.text.trim(),
-      'password': _passwordController.text, // En un modelo real de prod debes cifrarla (ej. bcrypt)
+      'password': _passwordController.text, 
       'role': _selectedRole,
       'location': 'Sin definir',
       'favorites': '[]',
@@ -77,7 +78,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (mounted) {
       setState(() => _isLoading = false);
-      
+
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -88,7 +89,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         );
-        Navigator.pop(context); // Volver al inicio de sesión
+        Navigator.pop(context);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -165,16 +166,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       validator: (value) => value == null || !value.contains('@') ? tr('Correo inválido', 'Invalid email') : null,
                     ),
                     const SizedBox(height: 16),
+
+                    // --- CAMPO DE TELÉFONO ARREGLADO ---
                     TextFormField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
+                      maxLength: 10, // <--- Límite de 10 números
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly, // <--- Bloquea letras o símbolos raros
+                      ],
                       decoration: InputDecoration(
                         labelText: tr('Teléfono', 'Phone'),
                         prefixIcon: const Icon(Icons.phone_outlined),
+                        counterText: '', // <--- Oculta el contador de "0/10" para que se vea limpio
                       ),
-                      validator: (value) => value == null || value.isEmpty ? tr('Campo requerido', 'Required field') : null,
+                      validator: (value) => value == null || value.length < 10 ? tr('Ingresa 10 dígitos', 'Enter 10 digits') : null,
                     ),
                     const SizedBox(height: 16),
+
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,

@@ -41,8 +41,7 @@ class AgroGoApp extends StatelessWidget {
                   valueListenable: userRoleNotifier,
                   builder: (context, userRole, child) {
                     return MaterialApp(
-                      key: ValueKey(
-                          '$currentLang-$currentMode-$isLoggedIn-$userRole'),
+                      key: ValueKey('$isLoggedIn-$userRole'),
                       title: 'AgroGo',
                       debugShowCheckedModeBanner: false,
                       theme: AppTheme.lightTheme,
