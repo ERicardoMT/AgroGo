@@ -97,9 +97,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final newMessage = ChatMessage(
       id: 'M_${DateTime.now().millisecondsSinceEpoch}',
       conversationId: _conversationId,
-      senderId: 'me', // Current user
+      senderId: currentUserEmailNotifier.value ?? 'me', // Current user
       senderName: 'Yo',
-      senderRole: widget.otherUserRole == 'arrendador' ? 'rentador' : 'arrendador',
+      senderRole: userRoleNotifier.value,
       message: _messageController.text.trim(),
       sentAt: DateTime.now(),
       isRead: true,
@@ -162,7 +162,7 @@ class _ChatScreenState extends State<ChatScreen> {
               itemCount: _messages.length,
               itemBuilder: (context, index) {
                 final message = _messages[index];
-                final isMe = message.senderId == 'me';
+                final isMe = message.senderRole == userRoleNotifier.value;
 
                 return Align(
                   alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,

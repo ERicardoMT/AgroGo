@@ -60,10 +60,10 @@ class _CommunicationScreenState extends State<CommunicationScreen>
         String otherName = parts.isNotEmpty ? parts[0] : 'Usuario';
         String equipmentName = parts.length > 1 ? parts.sublist(1).join('_') : 'Equipo';
         
-        // Buscar un mensaje donde senderId sea 'other' para sacar bien el nombre
+        // Buscar un mensaje del otro rol para sacar bien el nombre
         ChatMessage? otherMsg;
         try {
-          otherMsg = msgs.firstWhere((element) => element.senderId != 'me');
+          otherMsg = msgs.firstWhere((element) => element.senderRole != userRoleNotifier.value);
           otherName = otherMsg.senderName;
         } catch (e) {
           // En caso de que no haya mensajes del otro
@@ -79,7 +79,7 @@ class _CommunicationScreenState extends State<CommunicationScreen>
             otherUserRole: otherMsg?.senderRole ?? 'Rentador/Arrendador',
             lastMessageAt: msgs.last.sentAt,
             lastMessage: msgs.last.message,
-            unreadCount: msgs.where((m) => !m.isRead && m.senderId != 'me').length,
+            unreadCount: msgs.where((m) => !m.isRead && m.senderRole != userRoleNotifier.value).length,
             messages: msgs,
           ),
         );
@@ -348,7 +348,7 @@ class _CommunicationScreenState extends State<CommunicationScreen>
             itemCount: selectedConversation!.messages.length,
             itemBuilder: (context, index) {
               final message = selectedConversation!.messages[index];
-              final isMe = message.senderId == 'me';
+              final isMe = message.senderRole == userRoleNotifier.value;
 
               return Align(
                 alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -409,7 +409,7 @@ class _CommunicationScreenState extends State<CommunicationScreen>
                     final newMsg = ChatMessage(
                       id: 'M_${DateTime.now().millisecondsSinceEpoch}',
                       conversationId: selectedConversation!.id,
-                      senderId: 'me',
+                      senderId: currentUserEmailNotifier.value ?? 'me',
                       senderName: 'Yo',
                       senderRole: userRoleNotifier.value, // rentador or arrendador
                       message: messageController.text.trim(),
