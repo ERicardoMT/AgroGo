@@ -3,6 +3,7 @@ import '../globals.dart';
 import '../theme/app_theme.dart';
 import '../models/chat_message.dart';
 import '../models/review.dart';
+import '../data/database_helper.dart';
 
 class CommunicationScreen extends StatefulWidget {
   const CommunicationScreen({super.key});
@@ -14,12 +15,13 @@ class CommunicationScreen extends StatefulWidget {
 class _CommunicationScreenState extends State<CommunicationScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  late List<ChatConversation> conversations;
-  late List<Review> myReviews;
-  late List<RenterRating> renterRatings;
+  List<ChatConversation> conversations = [];
+  List<Review> myReviews = [];
+  List<RenterRating> renterRatings = [];
 
   ChatConversation? selectedConversation;
   final messageController = TextEditingController();
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -35,10 +37,70 @@ class _CommunicationScreenState extends State<CommunicationScreen>
     super.dispose();
   }
 
-  void _loadMockData() {
-    conversations = [];
-    myReviews = [];
-    renterRatings = [];
+  Future<void> _loadMockData() async {
+    try {
+      final db = await DatabaseHelper().database;
+      final messagesData = await db.query('chat_messages', orderBy: 'sentAt ASC');
+      
+      // Agrupar mensajes en conversaciones
+      Map<String, List<ChatMessage>> grouped = {};
+      for (var m in messagesData) {
+        final msg = ChatMessage.fromJson(m);
+        if (!grouped.containsKey(msg.conversationId)) {
+          grouped[msg.conversationId] = [];
+        }
+        grouped[msg.conversationId]!.add(msg);
+      }
+      
+      List<ChatConversation> loadedConversations = [];
+      grouped.forEach((convId, msgs) {
+        if (msgs.isEmpty) return;
+        
+        final parts = convId.split('_');
+        String otherName = parts.isNotEmpty ? parts[0] : 'Usuario';
+        String equipmentName = parts.length > 1 ? parts.sublist(1).join('_') : 'Equipo';
+        
+        // Buscar un mensaje donde senderId sea 'other' para sacar bien el nombre
+        ChatMessage? otherMsg;
+        try {
+          otherMsg = msgs.firstWhere((element) => element.senderId != 'me');
+          otherName = otherMsg.senderName;
+        } catch (e) {
+          // En caso de que no haya mensajes del otro
+          otherName = parts.isNotEmpty ? parts[0] : 'Usuario';
+        }
+
+        loadedConversations.add(
+          ChatConversation(
+            id: convId,
+            rentalId: 'R_$convId', // Simulado
+            equipmentName: equipmentName,
+            otherUserName: otherName,
+            otherUserRole: otherMsg?.senderRole ?? 'Rentador/Arrendador',
+            lastMessageAt: msgs.last.sentAt,
+            lastMessage: msgs.last.message,
+            unreadCount: msgs.where((m) => !m.isRead && m.senderId != 'me').length,
+            messages: msgs,
+          ),
+        );
+      });
+
+      if (mounted) {
+        setState(() {
+          conversations = loadedConversations;
+          myReviews = [];
+          renterRatings = [];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print("Error loading messages: $e");
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -87,6 +149,10 @@ class _CommunicationScreenState extends State<CommunicationScreen>
 
   // ========== TAB 1: CHAT ==========
   Widget _buildChatTab(bool isDark) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     if (conversations.isEmpty) {
       return Center(
         child: Column(
@@ -282,7 +348,7 @@ class _CommunicationScreenState extends State<CommunicationScreen>
             itemCount: selectedConversation!.messages.length,
             itemBuilder: (context, index) {
               final message = selectedConversation!.messages[index];
-              final isMe = message.senderRole == 'arrendador';
+              final isMe = message.senderId == 'me';
 
               return Align(
                 alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -338,15 +404,27 @@ class _CommunicationScreenState extends State<CommunicationScreen>
               const SizedBox(width: 8),
               FloatingActionButton(
                 mini: true,
-                onPressed: () {
-                  if (messageController.text.isNotEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                            tr('Mensaje enviado', 'Message sent')),
-                      ),
+                onPressed: () async {
+                  if (messageController.text.isNotEmpty && selectedConversation != null) {
+                    final newMsg = ChatMessage(
+                      id: 'M_${DateTime.now().millisecondsSinceEpoch}',
+                      conversationId: selectedConversation!.id,
+                      senderId: 'me',
+                      senderName: 'Yo',
+                      senderRole: userRoleNotifier.value, // rentador or arrendador
+                      message: messageController.text.trim(),
+                      sentAt: DateTime.now(),
+                      isRead: true,
                     );
-                    messageController.clear();
+                    
+                    // Insert into DB
+                    await DatabaseHelper().insert('chat_messages', newMsg.toJson());
+
+                    setState(() {
+                      selectedConversation!.messages.add(newMsg);
+                      // Move this conversation to top is done manually or by sorting
+                      messageController.clear();
+                    });
                   }
                 },
                 child: const Icon(Icons.send_rounded),

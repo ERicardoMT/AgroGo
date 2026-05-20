@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/chat_message.dart';
+import '../data/database_helper.dart';
 import '../globals.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -23,26 +24,65 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
-  late List<ChatMessage> _messages;
+  List<ChatMessage> _messages = [];
+  bool _isLoading = true;
+  
+  String get _conversationId => '${widget.otherUserName}_${widget.equipmentName}';
 
   @override
   void initState() {
     super.initState();
-    // mock some initial messages based on the role
-    _messages = [
-      ChatMessage(
-        id: 'M001',
-        conversationId: 'C_TEMP',
-        senderId: 'other',
-        senderName: widget.otherUserName,
-        senderRole: widget.otherUserRole,
-        message: widget.otherUserRole == 'arrendador' 
-            ? '¡Hola! ¿En qué puedo ayudarte con el ${widget.equipmentName}?' 
-            : 'Hola, tengo una pregunta sobre el alquiler.',
-        sentAt: DateTime.now().subtract(const Duration(minutes: 10)),
-        isRead: true,
-      ),
-    ];
+    _loadMessages();
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      final db = await DatabaseHelper().database;
+      final results = await db.query(
+        'chat_messages',
+        where: 'conversationId = ?',
+        whereArgs: [_conversationId],
+        orderBy: 'sentAt ASC',
+      );
+      
+      if (results.isEmpty) {
+        // Mock initial message
+        final initialMsg = ChatMessage(
+          id: 'M_${DateTime.now().millisecondsSinceEpoch}',
+          conversationId: _conversationId,
+          senderId: 'other',
+          senderName: widget.otherUserName,
+          senderRole: widget.otherUserRole,
+          message: widget.otherUserRole == 'arrendador' 
+              ? '¡Hola! ¿En qué puedo ayudarte con el ${widget.equipmentName}?' 
+              : 'Hola, tengo una pregunta sobre la renta del ${widget.equipmentName}.',
+          sentAt: DateTime.now().subtract(const Duration(minutes: 10)),
+          isRead: true,
+        );
+        await DatabaseHelper().insert('chat_messages', initialMsg.toJson());
+        
+        if (mounted) {
+          setState(() {
+            _messages = [initialMsg];
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _messages = results.map((m) => ChatMessage.fromJson(m)).toList();
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      print("Error loading messages: $e");
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -51,22 +91,30 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  void _sendMessage() {
+  void _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
 
+    final newMessage = ChatMessage(
+      id: 'M_${DateTime.now().millisecondsSinceEpoch}',
+      conversationId: _conversationId,
+      senderId: 'me', // Current user
+      senderName: 'Yo',
+      senderRole: widget.otherUserRole == 'arrendador' ? 'rentador' : 'arrendador',
+      message: _messageController.text.trim(),
+      sentAt: DateTime.now(),
+      isRead: true,
+      imageUrl: null, // ensure this is defined locally
+    );
+
+    // Save to DB
+    try {
+      await DatabaseHelper().insert('chat_messages', newMessage.toJson());
+    } catch (e) {
+      print("Error sending message: $e");
+    }
+
     setState(() {
-      _messages.add(
-        ChatMessage(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          conversationId: 'C_TEMP',
-          senderId: 'me', // Current user
-          senderName: 'Yo',
-          senderRole: widget.otherUserRole == 'arrendador' ? 'rentador' : 'arrendador',
-          message: _messageController.text.trim(),
-          sentAt: DateTime.now(),
-          isRead: true,
-        ),
-      );
+      _messages.add(newMessage);
       _messageController.clear();
     });
   }
@@ -106,7 +154,7 @@ class _ChatScreenState extends State<ChatScreen> {
           )
         ],
       ),
-      body: Column(
+      body: _isLoading ? const Center(child: CircularProgressIndicator()) : Column(
         children: [
           Expanded(
             child: ListView.builder(

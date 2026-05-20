@@ -3,6 +3,7 @@ import '../models/equipment.dart';
 import '../theme/app_theme.dart';
 import '../widgets/booking_bottom_sheet.dart';
 import '../globals.dart'; // <--- IMPORT GLOBAL
+import 'chat_screen.dart';
 
 class EquipmentDetailScreen extends StatefulWidget {
   final Equipment equipment;
@@ -350,7 +351,19 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                           ),
                         ),
                         IconButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatScreen(
+                                  otherUserName: equipment.ownerName,
+                                  equipmentName: equipment.name,
+                                  otherUserRole: 'arrendador',
+                                  otherUserPhone: 'Desconocido', // TODO: Obtener del equipo o backend
+                                ),
+                              ),
+                            );
+                          },
                           icon: Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(

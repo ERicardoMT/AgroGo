@@ -30,7 +30,7 @@ class ChatMessage {
       senderRole: json['senderRole'],
       message: json['message'],
       sentAt: DateTime.parse(json['sentAt']),
-      isRead: json['isRead'] ?? false,
+      isRead: json['isRead'] == 1 || json['isRead'] == true,
       imageUrl: json['imageUrl'],
     );
   }
@@ -44,7 +44,7 @@ class ChatMessage {
       'senderRole': senderRole,
       'message': message,
       'sentAt': sentAt.toIso8601String(),
-      'isRead': isRead,
+      'isRead': isRead ? 1 : 0,
       'imageUrl': imageUrl,
     };
   }
