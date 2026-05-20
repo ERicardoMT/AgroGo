@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
 import '../models/booking.dart';
 import '../theme/app_theme.dart';
 import '../widgets/booking_card.dart';
-import '../globals.dart'; // <--- IMPORT GLOBAL
+import '../globals.dart'; 
+import '../data/database_helper.dart';
 
 class BookingsScreen extends StatefulWidget {
   const BookingsScreen({super.key});
@@ -15,6 +15,8 @@ class BookingsScreen extends StatefulWidget {
 class _BookingsScreenState extends State<BookingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  List<Booking> _allBookings = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -23,36 +25,81 @@ class _BookingsScreenState extends State<BookingsScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _fetchBookings();
+  }
+
+  @override
   void dispose() {
     _tabController.dispose();
     super.dispose();
   }
 
+  Future<void> _fetchBookings() async {
+    final dbHelper = DatabaseHelper();
+    final data = await dbHelper.getAll('bookings'); 
+    final currentEmail = currentUserEmailNotifier.value;
+
+    if (currentEmail == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
+    // Filtramos por el usuario logueado
+    final myBookingsData = data.where((b) => b['userId'] == currentEmail).toList();
+
+    // --- CORRECCIÓN: Mapeo exacto con tu modelo Booking ---
+    final parsedBookings = myBookingsData.map((b) {
+      return Booking(
+        id: b['id']?.toString() ?? '',
+        equipmentId: b['equipmentId']?.toString() ?? '',
+        equipmentName: b['equipmentName']?.toString() ?? 'Equipo',
+        equipmentCategory: b['equipmentCategory']?.toString() ?? 'Categoría',
+        userId: b['userId']?.toString() ?? '',
+        startDate: DateTime.tryParse(b['startDate']?.toString() ?? '') ?? DateTime.now(),
+        endDate: DateTime.tryParse(b['endDate']?.toString() ?? '') ?? DateTime.now(),
+        totalPrice: (b['totalPrice'] ?? 0).toDouble(),
+        status: BookingStatus.values.firstWhere(
+          (e) => e.name == b['status']?.toString().toLowerCase(),
+          orElse: () => BookingStatus.pending,
+        ),
+        createdAt: DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime.now(),
+      );
+    }).toList();
+
+    if (mounted) {
+      setState(() {
+        _allBookings = parsedBookings;
+        _isLoading = false;
+      });
+    }
+  }
+
   List<Booking> _getFilteredBookings(int tabIndex) {
     switch (tabIndex) {
-      case 0:
-        return MockData.bookings;
-      case 1:
-        return MockData.bookings
+      case 0: // Todas
+        return _allBookings;
+      case 1: // Activas
+        return _allBookings
             .where((b) =>
                 b.status == BookingStatus.confirmed ||
                 b.status == BookingStatus.active ||
                 b.status == BookingStatus.pending)
             .toList();
-      case 2:
-        return MockData.bookings
+      case 2: // Historial
+        return _allBookings
             .where((b) =>
                 b.status == BookingStatus.completed ||
                 b.status == BookingStatus.cancelled)
             .toList();
       default:
-        return MockData.bookings;
+        return _allBookings;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Detectamos el modo oscuro
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return SafeArea(
@@ -62,7 +109,7 @@ class _BookingsScreenState extends State<BookingsScreen>
           Padding(
             padding: const EdgeInsets.all(20),
             child: Text(
-              tr('Mis Reservas', 'My Bookings'), // TRADUCCIÓN
+              tr('Mis Reservas', 'My Bookings'),
               style: Theme.of(context).textTheme.headlineMedium,
             ),
           ),
@@ -71,12 +118,14 @@ class _BookingsScreenState extends State<BookingsScreen>
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
             decoration: BoxDecoration(
-              color: isDark ? Colors.grey[900] : AppTheme.cardColor, // ADAPTACIÓN
+              color: isDark ? Colors.grey[900] : AppTheme.cardColor,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: isDark ? Colors.grey[800]! : AppTheme.borderColor), // ADAPTACIÓN
+              border: Border.all(color: isDark ? Colors.grey[800]! : AppTheme.borderColor),
             ),
             child: TabBar(
               controller: _tabController,
+              // --- CORRECCIÓN: Evita que el fondo verde se corte ---
+              indicatorSize: TabBarIndicatorSize.tab, 
               indicator: BoxDecoration(
                 color: AppTheme.primaryColor,
                 borderRadius: BorderRadius.circular(10),
@@ -86,25 +135,26 @@ class _BookingsScreenState extends State<BookingsScreen>
               unselectedLabelColor: AppTheme.textSecondary,
               dividerColor: Colors.transparent,
               tabs: [
-                Tab(text: tr('Todas', 'All')), // TRADUCCIÓN
-                Tab(text: tr('Activas', 'Active')), // TRADUCCIÓN
-                Tab(text: tr('Historial', 'History')), // TRADUCCIÓN
+                Tab(text: tr('Todas', 'All')),
+                Tab(text: tr('Activas', 'Active')),
+                Tab(text: tr('Historial', 'History')),
               ],
             ),
           ),
 
           const SizedBox(height: 16),
 
-          // Bookings List
           Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildBookingsList(0),
-                _buildBookingsList(1),
-                _buildBookingsList(2),
-              ],
-            ),
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildBookingsList(0),
+                      _buildBookingsList(1),
+                      _buildBookingsList(2),
+                    ],
+                  ),
           ),
         ],
       ),
@@ -119,21 +169,9 @@ class _BookingsScreenState extends State<BookingsScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.calendar_today_outlined,
-              size: 64,
-              color: AppTheme.textMuted,
-            ),
+            Icon(Icons.calendar_today_outlined, size: 64, color: AppTheme.textMuted),
             const SizedBox(height: 16),
-            Text(
-              tr('No hay reservas', 'No bookings'), // TRADUCCIÓN
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              tr('Cuando realices una reserva aparecerá aquí', 'When you make a booking, it will appear here'), // TRADUCCIÓN
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
+            Text(tr('No hay reservas', 'No bookings'), style: Theme.of(context).textTheme.titleMedium),
           ],
         ),
       );
