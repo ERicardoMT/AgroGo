@@ -31,8 +31,6 @@ class _LoginScreenState extends State<LoginScreen>
   void initState() {
     super.initState();
 
-    // Optimización de UI: una sola animación controla entrada y opacidad,
-    // evitando varios controllers innecesarios para una pantalla ligera.
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 650),
@@ -81,11 +79,9 @@ class _LoginScreenState extends State<LoginScreen>
     final user = await dbHelper.loginUser(email, password, _selectedRole);
 
     if (user != null) {
-      // Guardar información global o local (por ahora en tus variables Notifier)
       userRoleNotifier.value = _selectedRole;
-      currentUserEmailNotifier.value = email; // <-- GUARDAMOS EL CORREO DEL USUARIO LOGUEADO
+      currentUserEmailNotifier.value = email; 
       isLoggedInNotifier.value = true;
-      // Podrías usar SharedPreferences si deseas que perdure (ej: "remember me")
     } else {
       if (!mounted) return;
 
@@ -466,11 +462,14 @@ class _LoginScreenState extends State<LoginScreen>
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         TextButton(
-          onPressed: () {
-            Navigator.push(
+          onPressed: () async { // <--- SE VOLVIÓ ASÍNCRONO
+            await Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const RegisterScreen()),
             );
+            // <--- LIMPIA LAS CAJAS AL REGRESAR DE REGISTRARSE
+            _emailController.clear();
+            _passwordController.clear();
           },
           child: Text(
             tr('Crear cuenta en AgroGo', 'Create AgroGo account'),
@@ -503,6 +502,9 @@ class _LoginScreenState extends State<LoginScreen>
                 isSelected: _selectedRole == 'rentador',
                 onTap: () {
                   setState(() => _selectedRole = 'rentador');
+                  // <--- LIMPIA LAS CAJAS AL CAMBIAR DE ROL
+                  _emailController.clear();
+                  _passwordController.clear();
                 },
                 isDark: isDark,
               ),
@@ -514,6 +516,9 @@ class _LoginScreenState extends State<LoginScreen>
                 isSelected: _selectedRole == 'arrendador',
                 onTap: () {
                   setState(() => _selectedRole = 'arrendador');
+                  // <--- LIMPIA LAS CAJAS AL CAMBIAR DE ROL
+                  _emailController.clear();
+                  _passwordController.clear();
                 },
                 isDark: isDark,
               ),

@@ -4,7 +4,8 @@ import '../theme/app_theme.dart';
 import '../widgets/equipment_card.dart';
 import '../widgets/category_chip.dart';
 import 'equipment_detail_screen.dart';
-import '../globals.dart'; // <--- IMPORT GLOBAL
+import '../globals.dart'; 
+import '../data/database_helper.dart'; // <--- IMPORTAMOS SQLITE
 
 class HomeScreen extends StatefulWidget {
   final Set<String> favoriteIds;
@@ -24,11 +25,41 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String? selectedCategory;
+  
+
+  String _userName = 'Cargando...';
+  String _userLocation = '...';
+
+  @override
+  void initState() {
+    super.didChangeDependencies();
+    _loadUserHeader();
+  }
+
+  // --- FUNCIÓN PARA CARGAR DATOS DE SQLITE ---
+  Future<void> _loadUserHeader() async {
+    final dbHelper = DatabaseHelper();
+    final users = await dbHelper.getAll('users');
+    final currentEmail = currentUserEmailNotifier.value;
+
+    if (users.isNotEmpty && currentEmail != null) {
+      try {
+        final miUsuario = users.firstWhere((user) => user['email'] == currentEmail);
+        if (mounted) {
+          setState(() {
+            _userName = miUsuario['name']?.toString() ?? 'Usuario'; 
+            _userLocation = miUsuario['location']?.toString() ?? 'Sin definir';
+          });
+        }
+      } catch (e) {
+        //Manejo de error
+      }
+    }
+  }
 
   void _mostrarNotificaciones(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     
-    // Verificamos si las notificaciones están apagadas desde el perfil
     if (!notificationsNotifier.value) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -71,6 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // ESTO AÚN ES MOCK DATA (Lo cambiaremos en el siguiente paso)
     final filteredEquipment = selectedCategory == null
         ? MockData.equipmentList
         : MockData.equipmentList
@@ -93,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          tr('Hola, ${MockData.currentUser.name.split(' ')[0]}', 'Hello, ${MockData.currentUser.name.split(' ')[0]}'),
+                          tr('Hola, $_userName', 'Hello, $_userName'),
                           style: Theme.of(context).textTheme.headlineSmall,
                         ),
                         const SizedBox(height: 4),
@@ -106,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              MockData.currentUser.location,
+                              _userLocation, // <--- UBICACIÓN REAL AQUÍ
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           ],
@@ -115,7 +147,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   
-                  // ---> AQUÍ CONECTAMOS LA CAMPANITA CON EL GESTURE DETECTOR <---
                   GestureDetector(
                     onTap: () => _mostrarNotificaciones(context),
                     child: Stack(
@@ -132,7 +163,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: isDark ? Colors.white : AppTheme.textPrimary, 
                           ),
                         ),
-                        // El puntito de notificación que desaparece si apagas el switch
                         ValueListenableBuilder<bool>(
                           valueListenable: notificationsNotifier,
                           builder: (context, isEnabled, child) {

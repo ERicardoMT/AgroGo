@@ -45,6 +45,7 @@ class DatabaseHelper {
         location TEXT NOT NULL,
         profileImage TEXT,
         favorites TEXT,  -- JSON list
+        profile_picture TEXT,
         createdAt TEXT NOT NULL
       )
     ''');
@@ -244,25 +245,21 @@ class DatabaseHelper {
 
   // --- MÉTODOS CRUD GENÉRICOS ---
   
-  // Insertar de manera genérica
   Future<int> insert(String table, Map<String, dynamic> data) async {
     final db = await database;
     return await db.insert(table, data, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  // Leer todos de una tabla
   Future<List<Map<String, dynamic>>> getAll(String table) async {
     final db = await database;
     return await db.query(table);
   }
 
-  // Actualizar un registro específico
   Future<int> update(String table, Map<String, dynamic> data, String id) async {
     final db = await database;
     return await db.update(table, data, where: 'id = ?', whereArgs: [id]);
   }
 
-  // Eliminar un registro específico
   Future<int> delete(String table, String id) async {
     final db = await database;
     return await db.delete(table, where: 'id = ?', whereArgs: [id]);
@@ -270,18 +267,16 @@ class DatabaseHelper {
 
   // --- MÉTODOS DE AUTENTICACIÓN ---
   
-  // Registrar usuario
   Future<bool> registerUser(Map<String, dynamic> userMap) async {
     final db = await database;
     try {
       await db.insert('users', userMap);
-      return true; // Éxito
+      return true; 
     } catch (e) {
-      return false; // Posiblemente el correo ya existe
+      return false; 
     }
   }
 
-  // Login de usuario
   Future<Map<String, dynamic>?> loginUser(String email, String password, String role) async {
     final db = await database;
     final result = await db.query(
@@ -292,11 +287,9 @@ class DatabaseHelper {
     if (result.isNotEmpty) {
       return result.first;
     }
-    return null; // Credenciales inválidas
+    return null; 
   }
 
-  // --- MÉTODO PARA DEPURACIÓN ---
-  // Imprime todo el contenido de una tabla en la consola
   Future<void> printTableData(String table) async {
     final db = await database;
     final List<Map<String, dynamic>> data = await db.query(table);
@@ -310,5 +303,39 @@ class DatabaseHelper {
       }
     }
     print('-----------------------------------');
+  }
+
+  // ==========================================
+  // --- NUEVOS MÉTODOS PARA EL PERFIL ---
+  // ==========================================
+
+  // 1. Guardar la ruta de la foto (o avatar) en SQLite
+  Future<bool> updateProfilePicture(String email, String imagePath) async {
+    final db = await database;
+    int result = await db.update(
+      'users',
+      {'profile_picture': imagePath},
+      where: 'email = ?',
+      whereArgs: [email],
+    );
+    return result > 0;
+  }
+
+  // 2. Contar las reservas reales del usuario en SQLite
+  Future<int> getUserBookingsCount() async {
+    final db = await database;
+    // Cuenta cuántos registros hay en la tabla de bookings
+    final result = await db.rawQuery('SELECT COUNT(*) FROM bookings');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+  // 3. Obtener el promedio de calificación
+  Future<double> getUserAverageRating() async {
+    final db = await database;
+    // Buscamos el promedio en la tabla 'reviews'
+    final result = await db.rawQuery('SELECT AVG(rating) as avgRating FROM reviews');
+    if (result.isNotEmpty && result.first['avgRating'] != null) {
+      return (result.first['avgRating'] as num).toDouble();
+    }
+    return 0.0; // Si no hay reseñas, devuelve 0.0
   }
 }

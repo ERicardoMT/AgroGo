@@ -18,14 +18,17 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  File? _imageFile;
-  String? _illustrationUrl; 
   final ImagePicker _picker = ImagePicker();
 
   String _userName = 'Cargando...';
   String _userLocation = 'Sin definir';
   String _userEmail = '';
   String _userInitials = '';
+  
+  // Variables reales de la Base de Datos
+  String? _profilePicturePath; 
+  int _totalReservas = 0; 
+  double _userRating = 0.0; // <--- Calificación real agregada
 
   final List<String> _ilustraciones = [
     'https://api.dicebear.com/7.x/adventurer/png?seed=Felix',
@@ -42,10 +45,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadUserData();
   }
 
+  // --- 1. CARGAR DATOS DESDE SQLITE ---
   Future<void> _loadUserData() async {
     final dbHelper = DatabaseHelper();
     final users = await dbHelper.getAll('users');
     final currentEmail = currentUserEmailNotifier.value; 
+
+    // Obtener cantidad de reservas y calificación reales
+    final reservas = await dbHelper.getUserBookingsCount();
+    final calificacion = await dbHelper.getUserAverageRating(); // <--- Consulta a la BD
 
     if (users.isNotEmpty && currentEmail != null) {
       try {
@@ -55,6 +63,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _userName = miUsuario['name']?.toString() ?? 'Usuario';
             _userLocation = miUsuario['location']?.toString() ?? 'Sin definir';
             _userEmail = currentEmail;
+            _profilePicturePath = miUsuario['profile_picture']?.toString(); 
+            _totalReservas = reservas; 
+            _userRating = calificacion; // <--- Asignamos la calificación
             _userInitials = _userName.split(' ').map((n) => n.isNotEmpty ? n[0] : '').take(2).join().toUpperCase();
           });
         }
@@ -62,35 +73,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (mounted) {
           setState(() {
             _userName = 'Usuario';
-            _userLocation = 'Sin definir';
             _userEmail = currentEmail ?? '';
             _userInitials = 'US';
+            _totalReservas = reservas;
+            _userRating = calificacion; // <--- Asignamos la calificación en caso de error de usuario
           });
         }
       }
     }
   }
 
+  // --- 2. GUARDAR FOTO LOCAL (CÁMARA/GALERÍA) ---
   Future<void> _pickImage(ImageSource source) async {
     Navigator.pop(context); 
     try {
       final XFile? pickedFile = await _picker.pickImage(source: source);
       if (pickedFile != null) {
-        setState(() {
-          _imageFile = File(pickedFile.path);
-          _illustrationUrl = null; 
-        });
+        final currentEmail = currentUserEmailNotifier.value;
+        if (currentEmail != null) {
+          // Guardar en la base de datos
+          await DatabaseHelper().updateProfilePicture(currentEmail, pickedFile.path);
+          setState(() {
+            _profilePicturePath = pickedFile.path;
+          });
+        }
       }
     } catch (e) {
       print("Error al seleccionar imagen: $e");
     }
   }
 
-  void _seleccionarIlustracion(String url) {
-    setState(() {
-      _imageFile = null; 
-      _illustrationUrl = url; 
-    });
+  // --- 3. GUARDAR ILUSTRACIÓN (URL) ---
+  Future<void> _seleccionarIlustracion(String url) async {
+    final currentEmail = currentUserEmailNotifier.value;
+    if (currentEmail != null) {
+      // Guardar en la base de datos
+      await DatabaseHelper().updateProfilePicture(currentEmail, url);
+      setState(() {
+        _profilePicturePath = url;
+      });
+    }
     Navigator.pop(context); 
     Navigator.pop(context); 
   }
@@ -178,50 +200,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // --- MÉTODOS DE PAGO INTERACTIVOS ---
   void _mostrarMetodosPago(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    int metodoSeleccionado = 0; // 0 = MercadoPago, 1 = PayPal
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       backgroundColor: isDark ? Colors.grey[900] : Colors.white,
       builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(tr("Métodos de Pago", "Payment Methods"), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              ListTile(
-                leading: const Icon(Icons.credit_card, color: Colors.blue, size: 36),
-                title: const Text("Mercado Pago"),
-                subtitle: const Text("Terminada en •••• 4321"),
-                trailing: const Icon(Icons.check_circle, color: Colors.green),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.withOpacity(0.3))),
+        return StatefulBuilder( 
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(tr("Métodos de Pago", "Payment Methods"), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
+                  
+                  // Tarjeta Mercado Pago
+                  ListTile(
+                    leading: const Icon(Icons.credit_card, color: Colors.blue, size: 36),
+                    title: const Text("Mercado Pago"),
+                    subtitle: const Text("Terminada en •••• 4321"),
+                    trailing: metodoSeleccionado == 0 ? const Icon(Icons.check_circle, color: Colors.green) : null,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12), 
+                      side: BorderSide(color: metodoSeleccionado == 0 ? Colors.green : Colors.grey.withOpacity(0.3), width: metodoSeleccionado == 0 ? 2 : 1)
+                    ),
+                    onTap: () {
+                      setModalState(() => metodoSeleccionado = 0);
+                    },
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Tarjeta PayPal
+                  ListTile(
+                    leading: const Icon(Icons.paypal, color: Colors.indigo, size: 36),
+                    title: const Text("PayPal"),
+                    subtitle: Text(_userEmail), 
+                    trailing: metodoSeleccionado == 1 ? const Icon(Icons.check_circle, color: Colors.green) : null,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12), 
+                      side: BorderSide(color: metodoSeleccionado == 1 ? Colors.green : Colors.grey.withOpacity(0.3), width: metodoSeleccionado == 1 ? 2 : 1)
+                    ),
+                    onTap: () {
+                      setModalState(() => metodoSeleccionado = 1);
+                    },
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Botón Agregar Nuevo
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Redirigiendo a pasarela de pago segura..."), backgroundColor: Colors.blue),
+                      );
+                    },
+                    icon: const Icon(Icons.add),
+                    label: Text(tr("Agregar nuevo método", "Add new method")),
+                  ),
+                  const SizedBox(height: 10),
+                ],
               ),
-              const SizedBox(height: 10),
-              ListTile(
-                leading: const Icon(Icons.paypal, color: Colors.indigo, size: 36),
-                title: const Text("PayPal"),
-                subtitle: Text(_userEmail), // <-- Dinámico
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.withOpacity(0.3))),
-              ),
-              const SizedBox(height: 20),
-              OutlinedButton.icon(
-                onPressed: () => Navigator.pop(context),
-                icon: const Icon(Icons.add),
-                label: Text(tr("Agregar nuevo método", "Add new method")),
-              ),
-              const SizedBox(height: 10),
-            ],
-          ),
+            );
+          }
         );
       }
     );
   }
 
+  // --- DIRECCIONES INTERACTIVAS ---
   void _mostrarDirecciones(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -237,13 +292,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ListTile(
                 leading: const Icon(Icons.home, color: AppTheme.primaryColor, size: 32),
                 title: Text(tr("Ubicación Principal", "Main Location")),
-                subtitle: Text(_userLocation), // <-- Dinámico
+                subtitle: Text(_userLocation), 
                 trailing: const Icon(Icons.check_circle, color: Colors.green),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.grey.withOpacity(0.3))),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: const BorderSide(color: Colors.green, width: 2)),
               ),
               const SizedBox(height: 20),
               OutlinedButton.icon(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Abriendo mapa para seleccionar dirección..."), backgroundColor: Colors.blue),
+                  );
+                },
                 icon: const Icon(Icons.add_location_alt),
                 label: Text(tr("Agregar nueva dirección", "Add new address")),
               ),
@@ -255,9 +315,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Lógica para decidir qué imagen mostrar
   ImageProvider? _obtenerImagenAvatar() {
-    if (_imageFile != null) return FileImage(_imageFile!);
-    if (_illustrationUrl != null) return NetworkImage(_illustrationUrl!);
+    if (_profilePicturePath != null) {
+      if (_profilePicturePath!.startsWith('http')) {
+        return NetworkImage(_profilePicturePath!);
+      } else {
+        return FileImage(File(_profilePicturePath!));
+      }
+    }
     return null;
   }
 
@@ -288,7 +354,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           radius: 45,
                           backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
                           backgroundImage: _obtenerImagenAvatar(), 
-                          child: _imageFile == null && _illustrationUrl == null
+                          child: _profilePicturePath == null
                               ? Text(_userInitials, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.primaryColor))
                               : null,
                         ),
@@ -316,11 +382,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildStat(context, '${MockData.bookings.length}', tr('Reservas', 'Bookings')),
+                      _buildStat(context, '$_totalReservas', tr('Reservas', 'Bookings')),
                       Container(width: 1, height: 40, color: AppTheme.borderColor),
-                      _buildStat(context, '12', tr('Equipos rentados', 'Rented equip.')),
+                      _buildStat(context, '$_totalReservas', tr('Equipos rentados', 'Rented equip.')),
                       Container(width: 1, height: 40, color: AppTheme.borderColor),
-                      _buildStat(context, '4.8', tr('Calificación', 'Rating')),
+                      _buildStat(context, _userRating.toStringAsFixed(1), tr('Calificación', 'Rating')), // <--- CALIFICACIÓN DINÁMICA
                     ],
                   ),
                 ],
