@@ -145,49 +145,19 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
 
   // --- MÉTODOS DE RESPALDO (MOCK DATA) ---
   void _loadMockPendingRequests() {
-    pendingRequests = [
-      RentalRequest(
-        id: '1', rentalId: 'R001', equipmentName: 'Tractor John Deere 5075E',
-        renterName: 'Juan Pérez', renterPhone: '+34 912 345 678', renterLocation: 'Valladolid, España',
-        requestDate: DateTime.now().subtract(const Duration(hours: 3)),
-        startDate: DateTime.now().add(const Duration(days: 2)),
-        endDate: DateTime.now().add(const Duration(days: 5)),
-        status: 'pending', dailyRate: 150.0,
-      ),
-      RentalRequest(
-        id: '2', rentalId: 'R002', equipmentName: 'Cosechadora CLAAS',
-        renterName: 'María García', renterPhone: '+34 923 456 789', renterLocation: 'Palencia, España',
-        requestDate: DateTime.now().subtract(const Duration(hours: 1)),
-        startDate: DateTime.now().add(const Duration(days: 1)),
-        endDate: DateTime.now().add(const Duration(days: 3)),
-        status: 'pending', dailyRate: 280.0,
-      ),
-    ];
+    pendingRequests = [];
   }
 
   void _loadMockFleetStatus() {
-    fleetStatus = FleetStatus(totalEquipment: 6, rented: 3, available: 2, maintenance: 1);
+    fleetStatus = FleetStatus(totalEquipment: 0, rented: 0, available: 0, maintenance: 0);
   }
 
   void _loadMockIncome() {
-    monthlyIncome = MonthlyIncome(
-      totalIncome: 3450.00, pendingPayments: 850.00, completedPayments: 2600.00,
-      rentalsCompleted: 8, periodStart: DateTime(DateTime.now().year, DateTime.now().month, 1),
-      periodEnd: DateTime.now(),
-    );
+    monthlyIncome = MonthlyIncome(totalIncome: 0.0, pendingPayments: 0.0, completedPayments: 0.0, rentalsCompleted: 0, periodStart: DateTime.now(), periodEnd: DateTime.now());
   }
 
   void _loadMockAlerts() {
-    criticalAlerts = [
-      LandlordAlert(
-        id: 'A1', title: 'Renta atrasada', message: 'Tractor rentado por Carlos hace 2 horas. Debe ser devuelto en 30 min.',
-        type: 'critical', createdAt: DateTime.now().subtract(const Duration(minutes: 30)), rentalId: 'R003',
-      ),
-      LandlordAlert(
-        id: 'A2', title: 'Mantenimiento programado', message: 'La cosechadora requiere mantenimiento mañana a las 9:00 AM.',
-        type: 'warning', createdAt: DateTime.now().subtract(const Duration(hours: 2)), equipmentId: 'E002',
-      ),
-    ];
+    criticalAlerts = [];
   }
 
 
@@ -297,7 +267,7 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const NotificationsScreen(),
+                builder: (context) => NotificationsScreen(),
               ),
             );
           },
@@ -308,7 +278,7 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const LandlordProfileScreen(),
+                builder: (context) => LandlordProfileScreen(),
               ),
             );
           },
@@ -665,7 +635,7 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
                   borderRadius: BorderRadius.circular(2),
                   child: LinearProgressIndicator(
                     value:
-                        monthlyIncome.completedPayments / monthlyIncome.totalIncome,
+                        monthlyIncome.totalIncome > 0 ? (monthlyIncome.completedPayments / monthlyIncome.totalIncome) : 0.0,
                     backgroundColor: Colors.transparent,
                     valueColor: AlwaysStoppedAnimation(AppTheme.primaryColor),
                   ),

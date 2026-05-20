@@ -3,6 +3,10 @@ import '../globals.dart';
 import '../theme/app_theme.dart';
 import '../models/rental_request.dart';
 import '../models/rental_occupancy.dart';
+import '../data/database_helper.dart';
+
+import 'landlord_profile_screen.dart';
+import 'notifications_screen.dart';
 
 class RentalRequestsScreen extends StatefulWidget {
   const RentalRequestsScreen({super.key});
@@ -19,150 +23,108 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
   late List<RentalRequest> allRequests;
   late List<RentalOccupancy> rentalOccupancies;
 
+bool isLoading = true;
+
   @override
   void initState() {
     super.initState();
     _mainTabController = TabController(length: 3, vsync: this);
     _requestsTabController = TabController(length: 3, vsync: this);
-    _loadMockData();
+    _loadDataFromDB();
   }
 
-  @override
-  void dispose() {
-    _mainTabController.dispose();
-    _requestsTabController.dispose();
-    super.dispose();
-  }
+  Future<void> _loadDataFromDB() async {
+    final dbHelper = DatabaseHelper();
+    
+    // Cargar solicitudes
+    final requestsResult = await dbHelper.getAll('rental_requests');
+    // Cargar rentas activas
+    final occupanciesResult = await dbHelper.getAll('rental_occupancies');
+    
+    setState(() {
+      allRequests = requestsResult.map((map) {
+        return RentalRequest(
+          id: map['id'].toString(),
+          rentalId: map['rentalId'].toString(),
+          equipmentName: map['equipmentName'].toString(),
+          renterName: map['renterName'].toString(),
+          renterPhone: map['renterPhone']?.toString() ?? '',
+          renterLocation: map['renterLocation']?.toString() ?? '',
+          requestDate: DateTime.tryParse(map['requestDate'].toString()) ?? DateTime.now(),
+          startDate: DateTime.tryParse(map['startDate'].toString()) ?? DateTime.now(),
+          endDate: DateTime.tryParse(map['endDate'].toString()) ?? DateTime.now(),
+          status: map['status'].toString(),
+          dailyRate: (map['dailyRate'] as num?)?.toDouble() ?? 0.0,
+          notes: map['notes']?.toString(),
+        );
+      }).toList();
 
-  void _loadMockData() {
-    allRequests = [
-      // Solicitudes pendientes
-      RentalRequest(
-        id: '1',
-        rentalId: 'R001',
-        equipmentName: 'Tractor John Deere 5075E',
-        renterName: 'Juan Pérez',
-        renterPhone: '+34 612 345 678',
-        renterLocation: 'Córdoba, Argentina',
-        requestDate: DateTime.now().subtract(const Duration(hours: 3)),
-        startDate: DateTime.now().add(const Duration(days: 2)),
-        endDate: DateTime.now().add(const Duration(days: 5)),
-        status: 'pending',
-        dailyRate: 150.0,
-        notes: 'Necesita para labrar 80 hectáreas',
-      ),
-      RentalRequest(
-        id: '2',
-        rentalId: 'R002',
-        equipmentName: 'Cosechadora CLAAS',
-        renterName: 'María García',
-        renterPhone: '+34 656 789 012',
-        renterLocation: 'Santa Fe, Argentina',
-        requestDate: DateTime.now().subtract(const Duration(hours: 1)),
-        startDate: DateTime.now().add(const Duration(days: 1)),
-        endDate: DateTime.now().add(const Duration(days: 3)),
-        status: 'pending',
-        dailyRate: 280.0,
-        notes: 'Cosecha de trigo',
-      ),
-      // Solicitudes aceptadas
-      RentalRequest(
-        id: '3',
-        rentalId: 'R003',
-        equipmentName: 'Tractor Massey Ferguson 4275',
-        renterName: 'Carlos López',
-        renterPhone: '+34 698 765 432',
-        renterLocation: 'La Pampa, Argentina',
-        requestDate: DateTime.now().subtract(const Duration(days: 2)),
-        startDate: DateTime.now().subtract(const Duration(hours: 6)),
-        endDate: DateTime.now().add(const Duration(days: 4)),
-        status: 'approved',
-        dailyRate: 180.0,
-        notes: 'Renta en progreso',
-      ),
-      RentalRequest(
-        id: '4',
-        rentalId: 'R004',
-        equipmentName: 'Rastra de arrastre',
-        renterName: 'Roberto Martín',
-        renterPhone: '+34 712 345 678',
-        renterLocation: 'Buenos Aires, Argentina',
-        requestDate: DateTime.now().subtract(const Duration(days: 1)),
-        startDate: DateTime.now().add(const Duration(days: 5)),
-        endDate: DateTime.now().add(const Duration(days: 8)),
-        status: 'approved',
-        dailyRate: 45.0,
-      ),
-      // Solicitudes rechazadas
-      RentalRequest(
-        id: '5',
-        rentalId: 'R005',
-        equipmentName: 'Tractor John Deere 5075E',
-        renterName: 'Ana Rodríguez',
-        renterPhone: '+34 634 567 890',
-        renterLocation: 'Mendoza, Argentina',
-        requestDate: DateTime.now().subtract(const Duration(days: 5)),
-        startDate: DateTime.now().subtract(const Duration(days: 3)),
-        endDate: DateTime.now().add(const Duration(days: 2)),
-        status: 'rejected',
-        dailyRate: 150.0,
-        notes: 'Rechazo: Equipo en mantenimiento en esas fechas',
-      ),
-    ];
-
-    rentalOccupancies = [
-      RentalOccupancy(
-        id: 'RO001',
-        equipmentId: 'E001',
-        equipmentName: 'Tractor John Deere 5075E',
-        renterName: 'Carlos López',
-        startDate: DateTime.now().subtract(const Duration(hours: 6)),
-        endDate: DateTime.now().add(const Duration(days: 4)),
-        status: 'active',
-        rentalCost: 150.0,
-        location: 'La Pampa, Campo Principal',
-        latitude: -36.6201,
-        longitude: -64.2675,
-      ),
-      RentalOccupancy(
-        id: 'RO002',
-        equipmentId: 'E002',
-        equipmentName: 'Cosechadora CLAAS',
-        renterName: 'Próxima renta',
-        startDate: DateTime.now().add(const Duration(days: 7)),
-        endDate: DateTime.now().add(const Duration(days: 9)),
-        status: 'upcoming',
-        rentalCost: 280.0,
-        location: 'Santa Fe',
-      ),
-      RentalOccupancy(
-        id: 'RO003',
-        equipmentId: 'E003',
-        equipmentName: 'Tractor Massey Ferguson',
-        renterName: 'Disponible',
-        startDate: DateTime.now().subtract(const Duration(days: 10)),
-        endDate: DateTime.now(),
-        status: 'completed',
-        rentalCost: 180.0,
-      ),
-    ];
+      rentalOccupancies = occupanciesResult.map((map) {
+        return RentalOccupancy(
+          id: map['id'].toString(),
+          equipmentId: map['equipmentId']?.toString() ?? '',
+          equipmentName: map['equipmentName'].toString(),
+          renterName: map['renterName'].toString(),
+          startDate: DateTime.tryParse(map['startDate'].toString()) ?? DateTime.now(),
+          endDate: DateTime.tryParse(map['endDate'].toString()) ?? DateTime.now(),
+          status: map['status'].toString(),
+          rentalCost: (map['rentalCost'] as num?)?.toDouble() ?? 0.0,
+          location: map['location']?.toString(),
+          latitude: (map['latitude'] as num?)?.toDouble(),
+          longitude: (map['longitude'] as num?)?.toDouble(),
+        );
+      }).toList();
+      
+      isLoading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFFAFAFA),
+      backgroundColor: isDark
+          ? const Color(0xFF121212)
+          : const Color(0xFFFAFAFA),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         title: Text(
           tr('Solicitudes y Rentas', 'Requests and Rentals'),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
         ),
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => NotificationsScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.notifications_outlined),
+          ),
+          IconButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => LandlordProfileScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.person_outline),
+          ),
+          const SizedBox(width: 8),
+        ],
         bottom: TabBar(
           controller: _mainTabController,
           labelColor: AppTheme.primaryColor,
@@ -229,8 +191,9 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
   }
 
   Widget _buildRequestsList(bool isDark, String status) {
-    final filteredRequests =
-        allRequests.where((req) => req.status == status).toList();
+    final filteredRequests = allRequests
+        .where((req) => req.status == status)
+        .toList();
 
     if (filteredRequests.isEmpty) {
       return Center(
@@ -241,21 +204,24 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
               status == 'pending'
                   ? Icons.inbox_rounded
                   : (status == 'approved'
-                      ? Icons.check_circle_outline_rounded
-                      : Icons.cancel_outlined),
+                        ? Icons.check_circle_outline_rounded
+                        : Icons.cancel_outlined),
               size: 60,
               color: Colors.grey[400],
             ),
             const SizedBox(height: 16),
             Text(
               status == 'pending'
-                  ? tr('Sin solicitudes pendientes',
-                      'No pending requests')
+                  ? tr('Sin solicitudes pendientes', 'No pending requests')
                   : (status == 'approved'
-                      ? tr('Sin solicitudes aceptadas',
-                          'No accepted requests')
-                      : tr('Sin solicitudes rechazadas',
-                          'No rejected requests')),
+                        ? tr(
+                            'Sin solicitudes aceptadas',
+                            'No accepted requests',
+                          )
+                        : tr(
+                            'Sin solicitudes rechazadas',
+                            'No rejected requests',
+                          )),
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           ],
@@ -272,8 +238,7 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
   }
 
   Widget _buildRequestCard(RentalRequest request, bool isDark, String status) {
-    final daysUntilStart =
-        request.startDate.difference(DateTime.now()).inDays;
+    final daysUntilStart = request.startDate.difference(DateTime.now()).inDays;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12, left: 4, right: 4),
@@ -298,9 +263,9 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                     Text(
                       request.equipmentName,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -308,38 +273,38 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                     Text(
                       request.renterName,
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: isDark ? Colors.grey[400] : Colors.grey[700],
-                            fontSize: 11,
-                          ),
+                        color: isDark ? Colors.grey[400] : Colors.grey[700],
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: status == 'pending'
                       ? Colors.orange.withOpacity(isDark ? 0.2 : 0.1)
                       : (status == 'approved'
-                          ? Colors.green.withOpacity(isDark ? 0.2 : 0.1)
-                          : Colors.red.withOpacity(isDark ? 0.2 : 0.1)),
+                            ? Colors.green.withOpacity(isDark ? 0.2 : 0.1)
+                            : Colors.red.withOpacity(isDark ? 0.2 : 0.1)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   status == 'pending'
                       ? tr('Pendiente', 'Pending')
                       : (status == 'approved'
-                          ? tr('Aceptada', 'Accepted')
-                          : tr('Rechazada', 'Rejected')),
+                            ? tr('Aceptada', 'Accepted')
+                            : tr('Rechazada', 'Rejected')),
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: status == 'pending'
-                            ? Colors.orange
-                            : (status == 'approved'
-                                ? Colors.green
-                                : Colors.red),
-                      ),
+                    fontWeight: FontWeight.w600,
+                    color: status == 'pending'
+                        ? Colors.orange
+                        : (status == 'approved' ? Colors.green : Colors.red),
+                  ),
                 ),
               ),
             ],
@@ -357,9 +322,9 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                 child: Text(
                   request.renterLocation,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: isDark ? Colors.grey[400] : Colors.grey[700],
-                        fontSize: 11,
-                      ),
+                    color: isDark ? Colors.grey[400] : Colors.grey[700],
+                    fontSize: 11,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -378,9 +343,9 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
               Text(
                 request.renterPhone,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: isDark ? Colors.grey[400] : Colors.grey[700],
-                      fontSize: 11,
-                    ),
+                  color: isDark ? Colors.grey[400] : Colors.grey[700],
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
@@ -421,10 +386,10 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
               child: Text(
                 request.notes!,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: isDark ? Colors.grey[300] : Colors.grey[700],
-                      fontSize: 11,
-                      height: 1.3,
-                    ),
+                  color: isDark ? Colors.grey[300] : Colors.grey[700],
+                  fontSize: 11,
+                  height: 1.3,
+                ),
               ),
             ),
           ],
@@ -439,8 +404,7 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                         SnackBar(
                           behavior: SnackBarBehavior.floating,
                           content: Text(
-                            tr('Solicitud rechazada',
-                                'Request rejected'),
+                            tr('Solicitud rechazada', 'Request rejected'),
                           ),
                         ),
                       );
@@ -457,8 +421,7 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                         SnackBar(
                           behavior: SnackBarBehavior.floating,
                           content: Text(
-                            tr('Solicitud aprobada',
-                                'Request approved'),
+                            tr('Solicitud aprobada', 'Request approved'),
                           ),
                         ),
                       );
@@ -494,10 +457,10 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
           Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppTheme.primaryColor,
-                  fontWeight: FontWeight.w500,
-                  fontSize: 10,
-                ),
+              color: AppTheme.primaryColor,
+              fontWeight: FontWeight.w500,
+              fontSize: 10,
+            ),
           ),
         ],
       ),
@@ -507,10 +470,12 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
   // ========== TAB 2: RENTAS ACTIVAS ==========
   Widget _buildActiveRentalsTab(bool isDark) {
     final activeRentals = rentalOccupancies
-        .where((r) =>
-            r.status == 'active' ||
-            (DateTime.now().isAfter(r.startDate) &&
-                DateTime.now().isBefore(r.endDate)))
+        .where(
+          (r) =>
+              r.status == 'active' ||
+              (DateTime.now().isAfter(r.startDate) &&
+                  DateTime.now().isBefore(r.endDate)),
+        )
         .toList();
 
     if (activeRentals.isEmpty) {
@@ -569,9 +534,9 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                     Text(
                       rental.equipmentName,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                          ),
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -579,16 +544,18 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                     Text(
                       'Rentado por: ${rental.renterName}',
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: isDark ? Colors.grey[400] : Colors.grey[700],
-                            fontSize: 11,
-                          ),
+                        color: isDark ? Colors.grey[400] : Colors.grey[700],
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.green.withOpacity(isDark ? 0.2 : 0.1),
                   borderRadius: BorderRadius.circular(8),
@@ -596,9 +563,9 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                 child: Text(
                   tr('En uso', 'In use'),
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green,
-                      ),
+                    fontWeight: FontWeight.w600,
+                    color: Colors.green,
+                  ),
                 ),
               ),
             ],
@@ -609,17 +576,11 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
             decoration: BoxDecoration(
               color: Colors.green.withOpacity(isDark ? 0.08 : 0.05),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: Colors.green.withOpacity(0.3),
-              ),
+              border: Border.all(color: Colors.green.withOpacity(0.3)),
             ),
             child: Row(
               children: [
-                Icon(
-                  Icons.schedule_rounded,
-                  color: Colors.green,
-                  size: 18,
-                ),
+                Icon(Icons.schedule_rounded, color: Colors.green, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(
@@ -628,20 +589,18 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                       Text(
                         tr('Tiempo restante', 'Time remaining'),
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: isDark
-                                  ? Colors.grey[400]
-                                  : Colors.grey[700],
-                              fontSize: 11,
-                            ),
+                          color: isDark ? Colors.grey[400] : Colors.grey[700],
+                          fontSize: 11,
+                        ),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         '$daysRemaining ${tr("días", "days")} y $hoursRemaining ${tr("horas", "hours")}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: Colors.green,
-                              fontSize: 12,
-                            ),
+                          fontWeight: FontWeight.w600,
+                          color: Colors.green,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
@@ -663,8 +622,8 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                   child: Text(
                     rental.location!,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: isDark ? Colors.grey[400] : Colors.grey[700],
-                        ),
+                      color: isDark ? Colors.grey[400] : Colors.grey[700],
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -680,9 +639,7 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       behavior: SnackBarBehavior.floating,
-                      content: Text(
-                        tr('Ubicación en mapa', 'Location on map'),
-                      ),
+                      content: Text(tr('Ubicación en mapa', 'Location on map')),
                     ),
                   );
                 },
@@ -694,10 +651,10 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                 Text(
                   '\$${rental.rentalCost}/día',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.primaryColor,
-                        fontSize: 12,
-                      ),
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.primaryColor,
+                    fontSize: 12,
+                  ),
                 ),
             ],
           ),
@@ -715,9 +672,9 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
         children: [
           Text(
             tr('Ocupación por Equipo', 'Equipment Occupancy'),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 16),
           ...rentalOccupancies.map(
@@ -747,9 +704,9 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
         children: [
           Text(
             occupancy.equipmentName,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 10),
           Container(
@@ -771,18 +728,19 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                     color: isActive
                         ? Colors.green
                         : (occupancy.status == 'upcoming'
-                            ? Colors.blue
-                            : Colors.grey),
-                    borderRadius:
-                        const BorderRadius.only(topLeft: Radius.circular(8)),
+                              ? Colors.blue
+                              : Colors.grey),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(8),
+                    ),
                   ),
                   child: Center(
                     child: Text(
                       isActive
                           ? tr('Activa', 'Active')
                           : (occupancy.status == 'upcoming'
-                              ? tr('Próxima', 'Upcoming')
-                              : tr('Completada', 'Completed')),
+                                ? tr('Próxima', 'Upcoming')
+                                : tr('Completada', 'Completed')),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 10,
@@ -801,14 +759,14 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
                       Text(
                         '${occupancy.startDate.day}/${occupancy.startDate.month} - ${occupancy.endDate.day}/${occupancy.endDate.month}',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       Text(
                         '($duration ${tr("días", "days")})',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: isDark ? Colors.grey[500] : Colors.grey[600],
-                            ),
+                          color: isDark ? Colors.grey[500] : Colors.grey[600],
+                        ),
                       ),
                     ],
                   ),
@@ -820,8 +778,8 @@ class _RentalRequestsScreenState extends State<RentalRequestsScreen>
           Text(
             'Rentador: ${occupancy.renterName}',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: isDark ? Colors.grey[400] : Colors.grey[700],
-                ),
+              color: isDark ? Colors.grey[400] : Colors.grey[700],
+            ),
           ),
         ],
       ),

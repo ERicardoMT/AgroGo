@@ -3,6 +3,11 @@ import '../globals.dart';
 import '../theme/app_theme.dart';
 import '../models/landlord_equipment.dart';
 import '../models/implement.dart';
+import '../data/database_helper.dart';
+import 'dart:convert';
+
+import 'landlord_profile_screen.dart';
+import 'notifications_screen.dart';
 
 class FleetManagementScreen extends StatefulWidget {
   const FleetManagementScreen({super.key});
@@ -12,106 +17,126 @@ class FleetManagementScreen extends StatefulWidget {
 }
 
 class _FleetManagementScreenState extends State<FleetManagementScreen> {
-  late List<LandlordEquipment> equipment;
+  List<LandlordEquipment> equipment = [];
+
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadMockData();
+    _loadEquipmentFromDB();
   }
 
-  void _loadMockData() {
-    equipment = [
-      LandlordEquipment(
-        id: 'E001',
-        name: 'Tractor Principal',
-        brand: 'John Deere',
-        model: '5075E',
-        year: 2020,
-        power: 75.0,
-        transmission: 'Manual',
-        traction: '4WD',
-        usageHours: 2450.0,
-        isActive: true,
-        condition: 'Excelente',
-        dailyRate: 150.0,
-        createdAt: DateTime(2020, 6, 15),
-        lastMaintenanceDate: DateTime.now().subtract(const Duration(days: 45)),
-        implements: [
-          Implement(
-            id: 'I001',
-            name: 'Rastra de 3 metros',
-            type: 'rastra',
-            width: 3.0,
-            condition: 'bueno',
-          ),
-          Implement(
-            id: 'I002',
-            name: 'Arado reversible',
-            type: 'arado',
-            condition: 'excelente',
-          ),
-        ],
-      ),
-      LandlordEquipment(
-        id: 'E002',
-        name: 'Tractor Secundario',
-        brand: 'Massey Ferguson',
-        model: '4275',
-        year: 2018,
-        power: 85.0,
-        transmission: 'Automática',
-        traction: '4WD',
-        usageHours: 3120.0,
-        isActive: true,
-        condition: 'Bueno',
-        dailyRate: 180.0,
-        createdAt: DateTime(2018, 3, 20),
-        lastMaintenanceDate: DateTime.now().subtract(const Duration(days: 20)),
-        implements: [
-          Implement(
-            id: 'I003',
-            name: 'Sembradora de precisión',
-            type: 'sembradora',
-            condition: 'excelente',
-          ),
-        ],
-      ),
-      LandlordEquipment(
-        id: 'E003',
-        name: 'Cosechadora',
-        brand: 'CLAAS',
-        model: 'Lexion 550',
-        year: 2019,
-        power: 290.0,
-        transmission: 'Automática',
-        traction: 'AWD',
-        usageHours: 1850.0,
-        isActive: false,
-        condition: 'Requiere Mantenimiento',
-        dailyRate: 280.0,
-        createdAt: DateTime(2019, 5, 10),
-        lastMaintenanceDate: DateTime.now().subtract(const Duration(days: 90)),
-      ),
-    ];
-  }
-
-  void _toggleEquipmentAvailability(int index) {
+  Future<void> _loadEquipmentFromDB() async {
+    final dbHelper = DatabaseHelper();
+    final allEquipments = await dbHelper.getAll('landlord_equipments');
+    
     setState(() {
-      equipment[index] = equipment[index].copyWith(
-        isActive: !equipment[index].isActive,
-      );
+      equipment = allEquipments.map((map) {
+        // Debemos decodificar implements si existe
+        List<Implement>? implementsList;
+        if (map['implements'] != null) {
+          try {
+             final List decoded = jsonDecode(map['implements'].toString());
+             implementsList = decoded.map((e) => Implement.fromJson(e)).toList();
+          } catch(e) {}
+        }
+        
+        List<String>? imgList;
+        if (map['imageUrls'] != null) {
+           try {
+             final List decoded = jsonDecode(map['imageUrls'].toString());
+             imgList = List<String>.from(decoded);
+           } catch(e) {}
+        }
+        
+        return LandlordEquipment(
+          id: map['id'].toString(),
+          name: map['name'].toString(),
+          brand: map['brand'].toString(),
+          model: map['model'].toString(),
+          year: map['year'] != null ? map['year'] as int : 2020,
+          power: (map['power'] as num?)?.toDouble() ?? 0.0,
+          transmission: map['transmission'].toString(),
+          traction: map['traction'].toString(),
+          usageHours: (map['usageHours'] as num?)?.toDouble() ?? 0.0,
+          isActive: map['isActive'] == 1,
+          condition: map['condition']?.toString(),
+          dailyRate: (map['dailyRate'] as num?)?.toDouble(),
+          createdAt: DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now(),
+          lastMaintenanceDate: map['lastMaintenanceDate'] != null ? DateTime.tryParse(map['lastMaintenanceDate'].toString()) : null,
+          imageUrls: imgList,
+          implements: implementsList,
+        );
+      }).toList();
+      isLoading = false;
     });
+  }
+
+  Future<void> _saveEquipmentToDB(LandlordEquipment eq) async {
+    final dbHelper = DatabaseHelper();
+    final map = {
+        'id': eq.id,
+        'name': eq.name,
+        'brand': eq.brand,
+        'model': eq.model,
+        'year': eq.year,
+        'power': eq.power,
+        'transmission': eq.transmission,
+        'traction': eq.traction,
+        'usageHours': eq.usageHours,
+        'isActive': eq.isActive ? 1 : 0,
+        'imageUrls': eq.imageUrls != null ? jsonEncode(eq.imageUrls) : null,
+        'condition': eq.condition,
+        'implements': eq.implements != null ? jsonEncode(eq.implements!.map((i) => i.toJson()).toList()) : null,
+        'dailyRate': eq.dailyRate,
+        'createdAt': eq.createdAt.toIso8601String(),
+        'lastMaintenanceDate': eq.lastMaintenanceDate?.toIso8601String(),
+    };
+    await dbHelper.insert('landlord_equipments', map);
+  }
+
+  Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
+    final dbHelper = DatabaseHelper();
+    final map = {
+        'id': eq.id,
+        'name': eq.name,
+        'brand': eq.brand,
+        'model': eq.model,
+        'year': eq.year,
+        'power': eq.power,
+        'transmission': eq.transmission,
+        'traction': eq.traction,
+        'usageHours': eq.usageHours,
+        'isActive': eq.isActive ? 1 : 0,
+        'imageUrls': eq.imageUrls != null ? jsonEncode(eq.imageUrls) : null,
+        'condition': eq.condition,
+        'implements': eq.implements != null ? jsonEncode(eq.implements!.map((i) => i.toJson()).toList()) : null,
+        'dailyRate': eq.dailyRate,
+        'lastMaintenanceDate': eq.lastMaintenanceDate?.toIso8601String(),
+    };
+    await dbHelper.update('landlord_equipments', map, eq.id);
+  }
+
+  Future<void> _toggleEquipmentAvailability(int index) async {
+    final updatedEq = equipment[index].copyWith(
+      isActive: !equipment[index].isActive,
+    );
+    setState(() {
+      equipment[index] = updatedEq;
+    });
+    await _updateEquipmentInDB(updatedEq);
   }
 
   void _showAddEquipmentDialog() {
     showDialog(
       context: context,
       builder: (context) => _AddEquipmentDialog(
-        onAdd: (newEquipment) {
+        onAdd: (newEquipment) async {
           setState(() {
             equipment.add(newEquipment);
           });
+          await _saveEquipmentToDB(newEquipment);
         },
       ),
     );
@@ -122,13 +147,14 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
       context: context,
       builder: (context) => _EquipmentDetailsDialog(
         equipment: eq,
-        onUpdate: (updatedEquipment) {
+        onUpdate: (updatedEquipment) async {
           setState(() {
             final index = equipment.indexWhere((e) => e.id == eq.id);
             if (index != -1) {
               equipment[index] = updatedEquipment;
             }
           });
+          await _updateEquipmentInDB(updatedEquipment);
         },
       ),
     );
@@ -166,12 +192,14 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
           ),
         ],
       ),
-      body: equipment.isEmpty
-          ? _buildEmptyState(isDark)
-          : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: Column(
-                children: [
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : equipment.isEmpty
+              ? _buildEmptyState(isDark)
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    children: [
                   ...equipment.asMap().entries.map(
                         (entry) => _buildEquipmentCard(
                           entry.value,
