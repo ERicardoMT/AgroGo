@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../models/equipment.dart';
 import '../theme/app_theme.dart';
 import '../globals.dart'; // <--- IMPORT GLOBAL
+import '../data/database_helper.dart';
 
 class BookingBottomSheet extends StatefulWidget {
   final Equipment equipment;
@@ -75,8 +76,34 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
     if (_startDate == null || _endDate == null) return;
     setState(() => _isLoading = true);
 
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 2));
+    final dbHelper = DatabaseHelper();
+    
+    // Generar un ID único para la solicitud
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    
+    // Obtener información del rentador (usaremos info genérica relacionada con el correo actual si existe)
+    final renterName = currentUserEmailNotifier.value?.split('@')[0] ?? 'Rentador';
+    
+    final requestMap = {
+      'id': id,
+      'rentalId': 'R-$id',
+      'equipmentName': widget.equipment.name,
+      'renterName': renterName,
+      'renterPhone': '1234567890', // Dato genérico para la demo
+      'renterLocation': 'Ubicación de $renterName',
+      'requestDate': DateTime.now().toIso8601String(),
+      'startDate': _startDate!.toIso8601String(),
+      'endDate': _endDate!.toIso8601String(),
+      'status': 'pending',
+      'dailyRate': widget.equipment.pricePerDay,
+      'notes': 'Reserva solicitada desde la App',
+    };
+
+    await dbHelper.insert('rental_requests', requestMap);
+
+    // Simulate network delay para mejor experiencia visual
+    await Future.delayed(const Duration(seconds: 1));
+    
     setState(() {
       _isLoading = false;
       _isSuccess = true;

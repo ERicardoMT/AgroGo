@@ -5,6 +5,7 @@ import '../theme/app_theme.dart';
 import '../widgets/equipment_card.dart';
 import 'equipment_detail_screen.dart';
 import '../globals.dart'; // <--- IMPORT GLOBAL
+import '../data/database_helper.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -19,6 +20,7 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Equipment> _results = [];
   bool _hasSearched = false;
   final Set<String> _favorites = {};
+  List<Equipment> _dbEquipments = []; // <--- Equipos reales de la base de datos
   
   final List<String> _recentSearches = [
     'Tractor John Deere',
@@ -33,6 +35,42 @@ class _SearchScreenState extends State<SearchScreen> {
     'Pivotes riego',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadEquipmentsFromDB();
+  }
+
+  Future<void> _loadEquipmentsFromDB() async {
+    final dbHelper = DatabaseHelper();
+    // Leemos la tabla donde los arrendadores guardan sus tractores ('landlord_equipments')
+    final dbData = await dbHelper.getAll('landlord_equipments');
+
+    if (dbData.isNotEmpty) {
+      setState(() {
+        _dbEquipments = dbData.map<Equipment>((e) {
+          return Equipment(
+            id: e['id']?.toString() ?? '',
+            name: e['name']?.toString() ?? 'Sin nombre',
+            category: 'Tractores', // o e['category'] si lo tienes
+            description: '${e['brand']} ${e['model']}',
+            location: 'Ubicación no especificada', // o e['location']
+            pricePerDay: (e['dailyRate'] as num?)?.toDouble() ?? 0.0,
+            pricePerWeek: 0.0,
+            pricePerMonth: 0.0,
+            rating: 0.0,
+            reviewCount: 0,
+            available: (e['isActive'] == 1),
+            ownerId: 'owner_id_temp', // o ligar al dueño real si lo guardas
+            ownerName: 'Arrendador', // Valor por defecto
+            images: [], // Lista de imágenes vacía o ruta por defecto
+            specs: {}, // Mapa de especificaciones vacío
+          );
+        }).toList();
+      });
+    }
+  }
+
   void _performSearch(String query) {
     if (query.isEmpty) {
       setState(() {
@@ -43,7 +81,8 @@ class _SearchScreenState extends State<SearchScreen> {
     }
 
     setState(() {
-      _results = MockData.equipmentList
+      // Usamos _dbEquipments en lugar de MockData.equipmentList
+      _results = _dbEquipments
           .where((e) =>
               e.name.toLowerCase().contains(query.toLowerCase()) ||
               e.category.toLowerCase().contains(query.toLowerCase()) ||

@@ -4,6 +4,7 @@ import '../theme/app_theme.dart';
 import '../models/rental_request.dart';
 import '../models/rental_occupancy.dart';
 import '../data/database_helper.dart';
+import 'package:sqflite/sqflite.dart'; // <--- Añadimos este import
 
 import 'landlord_profile_screen.dart';
 import 'notifications_screen.dart';
@@ -77,6 +78,70 @@ bool isLoading = true;
       
       isLoading = false;
     });
+  }
+
+  Future<void> _updateRequestStatus(RentalRequest request, String newStatus) async {
+    final dbHelper = DatabaseHelper();
+    final db = await dbHelper.database;
+
+    // Actualizamos el estado en rental_requests
+    await db.update(
+      'rental_requests',
+      {'status': newStatus},
+      where: 'id = ?',
+      whereArgs: [request.id],
+    );
+
+    // Si fue aprobado, lo agregamos como un occupancy activo para el calendario y mis rentas
+    if (newStatus == 'approved') {
+      final daysCount = request.endDate.difference(request.startDate).inDays + 1;
+      final rentalCost = daysCount * request.dailyRate;
+      
+      await db.insert('rental_occupancies', {
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'equipmentId': 'eq_${request.id}',
+        'equipmentName': request.equipmentName,
+        'renterName': request.renterName,
+        'startDate': request.startDate.toIso8601String(),
+        'endDate': request.endDate.toIso8601String(),
+        'status': 'active',
+        'rentalCost': rentalCost,
+        'location': request.renterLocation,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+      // Calcular comisiones y ganancias (ejemplo: 10% comisión)
+      final appCommission = rentalCost * 0.10;
+      final netProfit = rentalCost - appCommission;
+
+      await db.insert('transactions', {
+        'id': 'tx_${DateTime.now().millisecondsSinceEpoch}',
+        'rentalId': request.rentalId,
+        'equipmentName': request.equipmentName,
+        'renterName': request.renterName,
+        'totalAmount': rentalCost,
+        'appCommission': appCommission,
+        'netProfit': netProfit,
+        'transactionDate': DateTime.now().toIso8601String(),
+        'completedDate': DateTime.now().toIso8601String(), // Simular pago inmediato al aceptar
+        'status': 'completed',
+        'notes': 'Pago por alquiler de ${request.equipmentName}',
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    // Recargar datos
+    await _loadDataFromDB();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          newStatus == 'approved' 
+            ? 'Solicitud aprobada'
+            : 'Solicitud rechazada'
+        ),
+      ),
+    );
   }
 
   @override
@@ -400,14 +465,7 @@ bool isLoading = true;
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          behavior: SnackBarBehavior.floating,
-                          content: Text(
-                            tr('Solicitud rechazada', 'Request rejected'),
-                          ),
-                        ),
-                      );
+                      _updateRequestStatus(request, 'rejected'); // <--- Llamada a base de datos
                     },
                     icon: const Icon(Icons.close_rounded),
                     label: Text(tr('Rechazar', 'Reject')),
@@ -417,14 +475,7 @@ bool isLoading = true;
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          behavior: SnackBarBehavior.floating,
-                          content: Text(
-                            tr('Solicitud aprobada', 'Request approved'),
-                          ),
-                        ),
-                      );
+                      _updateRequestStatus(request, 'approved'); // <--- Llamada a base de datos
                     },
                     icon: const Icon(Icons.check_rounded),
                     label: Text(tr('Aceptar', 'Accept')),

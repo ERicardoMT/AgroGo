@@ -30,11 +30,32 @@ class _FinancesScreenState extends State<FinancesScreen>
   }
 
   Future<void> _loadAllData() async {
-    _loadMockData(); // Cargamos transacciones de mentira
+    await _loadRealTransactions(); // Cargamos transacciones de la BD
     await _loadRealBankAccounts(); // Cargamos cuentas bancarias de la BD
     setState(() {
       isLoading = false; // Detenemos la carga y dibujamos la pantalla
     });
+  }
+
+  Future<void> _loadRealTransactions() async {
+    final dbHelper = DatabaseHelper();
+    final realTransactions = await dbHelper.getAll('transactions');
+
+    transactions = realTransactions.map((map) {
+      return Transaction(
+        id: map['id'].toString(),
+        rentalId: map['rentalId'].toString(),
+        equipmentName: map['equipmentName'].toString(),
+        renterName: map['renterName'].toString(),
+        totalAmount: (map['totalAmount'] as num).toDouble(),
+        appCommission: (map['appCommission'] as num).toDouble(),
+        netProfit: (map['netProfit'] as num).toDouble(),
+        transactionDate: DateTime.tryParse(map['transactionDate'].toString()) ?? DateTime.now(),
+        completedDate: map['completedDate'] != null ? DateTime.tryParse(map['completedDate'].toString()) : null,
+        status: map['status'].toString(),
+        notes: map['notes']?.toString(),
+      );
+    }).toList();
   }
 
   Future<void> _loadRealBankAccounts() async {
@@ -127,6 +148,12 @@ class _FinancesScreenState extends State<FinancesScreen>
         ],
       ),
     );
+  }
+
+  double get _availableBalance {
+    return transactions
+        .where((t) => t.status == 'completed')
+        .fold(0.0, (sum, t) => sum + t.netProfit);
   }
 
   // ========== TAB 1: HISTORIAL DE TRANSACCIONES ==========
@@ -368,7 +395,7 @@ class _FinancesScreenState extends State<FinancesScreen>
               ),
               const SizedBox(height: 8),
               Text(
-                '\$2,750.50',
+                '\$${_availableBalance.toStringAsFixed(2)}',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: Colors.white,

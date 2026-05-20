@@ -11,7 +11,8 @@ import 'finances_screen.dart';
 import 'communication_screen.dart';
 import 'landlord_profile_screen.dart';
 import 'notifications_screen.dart'; 
-import '../data/database_helper.dart'; 
+import '../data/database_helper.dart';
+import 'package:sqflite/sqflite.dart'; // <---
 
 class LandlordMainScreen extends StatefulWidget {
   const LandlordMainScreen({super.key});
@@ -143,6 +144,67 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
     }
   }
 
+  Future<void> _updateRequestStatusOnDashboard(RentalRequest request, String newStatus) async {
+    final dbHelper = DatabaseHelper();
+    final db = await dbHelper.database;
+
+    await db.update(
+      'rental_requests',
+      {'status': newStatus},
+      where: 'id = ?',
+      whereArgs: [request.id],
+    );
+
+    if (newStatus == 'approved') {
+      final daysCount = request.endDate.difference(request.startDate).inDays + 1;
+      final rentalCost = daysCount * request.dailyRate;
+      
+      await db.insert('rental_occupancies', {
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'equipmentId': 'eq_${request.id}',
+        'equipmentName': request.equipmentName,
+        'renterName': request.renterName,
+        'startDate': request.startDate.toIso8601String(),
+        'endDate': request.endDate.toIso8601String(),
+        'status': 'active',
+        'rentalCost': rentalCost,
+        'location': request.renterLocation,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+      final appCommission = rentalCost * 0.10;
+      final netProfit = rentalCost - appCommission;
+
+      await db.insert('transactions', {
+        'id': 'tx_${DateTime.now().millisecondsSinceEpoch}',
+        'rentalId': request.rentalId,
+        'equipmentName': request.equipmentName,
+        'renterName': request.renterName,
+        'totalAmount': rentalCost,
+        'appCommission': appCommission,
+        'netProfit': netProfit,
+        'transactionDate': DateTime.now().toIso8601String(),
+        'completedDate': DateTime.now().toIso8601String(),
+        'status': 'completed',
+        'notes': 'Pago por alquiler de ${request.equipmentName}',
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    await _loadDataFromDB();
+    if (!mounted) return;
+    setState(() {}); // Forzar repintado del dashboard
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          newStatus == 'approved' 
+            ? 'Solicitud aprobada y transacción generada'
+            : 'Solicitud rechazada'
+        ),
+      ),
+    );
+  }
+
   // --- MÉTODOS DE RESPALDO (MOCK DATA) ---
   void _loadMockPendingRequests() {
     pendingRequests = [];
@@ -176,10 +238,7 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFFAFAFA),
-      body: IndexedStack(
-        index: _currentTabIndex,
-        children: screens,
-      ),
+      body: screens[_currentTabIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentTabIndex,
         onTap: (index) => setState(() => _currentTabIndex = index),
