@@ -100,16 +100,33 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
 
       // B) Calcular el estado de la flota
       final equipResult = await db.query('landlord_equipments');
+      final occupanciesResult = await db.query('rental_occupancies', where: 'status = ?', whereArgs: ['active']);
+
       if (equipResult.isNotEmpty) {
         int available = 0;
+        int maintenance = 0;
+        int rented = 0;
+
         for (var eq in equipResult) {
-          if (eq['isActive'] == 1) available++;
+          final eqName = eq['name'].toString();
+          final isEqInWorkshop = eq['isActive'] == 0 || eq['condition'] == 'Requiere Mantenimiento';
+          
+          final isEqRented = occupanciesResult.any((occ) => occ['equipmentName'] == eqName);
+
+          if (isEqInWorkshop) {
+            maintenance++;
+          } else if (isEqRented) {
+            rented++;
+          } else {
+            available++;
+          }
         }
+
         fleetStatus = FleetStatus(
           totalEquipment: equipResult.length,
-          rented: equipResult.length - available, // Simplificado
+          rented: rented,
           available: available,
-          maintenance: 0,
+          maintenance: maintenance,
         );
       } else {
         _loadMockFleetStatus(); // Fallback si no hay equipos
@@ -241,7 +258,15 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
       body: screens[_currentTabIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentTabIndex,
-        onTap: (index) => setState(() => _currentTabIndex = index),
+        onTap: (index) {
+          if (index == 0 && _currentTabIndex != 0) {
+            // Si el usuario regresa a "Inicio", recargamos datos de la base de datos
+            _loadDataFromDB().then((_) {
+              if (mounted) setState(() {});
+            });
+          }
+          setState(() => _currentTabIndex = index);
+        },
         type: BottomNavigationBarType.fixed,
         items: [
           BottomNavigationBarItem(
