@@ -6,7 +6,9 @@ import '../models/review.dart';
 import '../data/database_helper.dart';
 
 class CommunicationScreen extends StatefulWidget {
-  const CommunicationScreen({super.key});
+  final String? initialConversationId;
+
+  const CommunicationScreen({super.key, this.initialConversationId});
 
   @override
   State<CommunicationScreen> createState() => _CommunicationScreenState();
@@ -39,7 +41,15 @@ class _CommunicationScreenState extends State<CommunicationScreen>
 
   Future<void> _loadMockData() async {
     try {
-      final db = await DatabaseHelper().database;
+      final dbHelper = DatabaseHelper();
+      if (widget.initialConversationId != null) {
+        await dbHelper.markConversationMessagesAsRead(
+          widget.initialConversationId!,
+          userRoleNotifier.value,
+        );
+      }
+
+      final db = await dbHelper.database;
       final messagesData = await db.query('chat_messages', orderBy: 'sentAt ASC');
       
       // Agrupar mensajes en conversaciones
@@ -85,9 +95,19 @@ class _CommunicationScreenState extends State<CommunicationScreen>
         );
       });
 
+      ChatConversation? openConversation;
+      if (widget.initialConversationId != null) {
+        try {
+          openConversation = loadedConversations.firstWhere(
+            (c) => c.id == widget.initialConversationId,
+          );
+        } catch (_) {}
+      }
+
       if (mounted) {
         setState(() {
           conversations = loadedConversations;
+          selectedConversation = openConversation;
           myReviews = [];
           renterRatings = [];
           _isLoading = false;
@@ -183,13 +203,20 @@ class _CommunicationScreenState extends State<CommunicationScreen>
     );
   }
 
+  Future<void> _openConversation(ChatConversation conversation) async {
+    await DatabaseHelper().markConversationMessagesAsRead(
+      conversation.id,
+      userRoleNotifier.value,
+    );
+    if (!mounted) return;
+    setState(() {
+      selectedConversation = conversation;
+    });
+  }
+
   Widget _buildConversationCard(ChatConversation conversation, bool isDark) {
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          selectedConversation = conversation;
-        });
-      },
+      onTap: () => _openConversation(conversation),
       child: Container(
         margin: const EdgeInsets.only(bottom: 10, left: 4, right: 4),
         padding: const EdgeInsets.all(12),
@@ -406,12 +433,22 @@ class _CommunicationScreenState extends State<CommunicationScreen>
                 mini: true,
                 onPressed: () async {
                   if (messageController.text.isNotEmpty && selectedConversation != null) {
+                    String senderName = tr('Usuario', 'User');
+                    final email = currentUserEmailNotifier.value;
+                    if (email != null) {
+                      final users = await DatabaseHelper().getAll('users');
+                      try {
+                        final user = users.firstWhere((u) => u['email'] == email);
+                        senderName = user['name']?.toString() ?? senderName;
+                      } catch (_) {}
+                    }
+
                     final newMsg = ChatMessage(
                       id: 'M_${DateTime.now().millisecondsSinceEpoch}',
                       conversationId: selectedConversation!.id,
                       senderId: currentUserEmailNotifier.value ?? 'me',
-                      senderName: 'Yo',
-                      senderRole: userRoleNotifier.value, // rentador or arrendador
+                      senderName: senderName,
+                      senderRole: userRoleNotifier.value,
                       message: messageController.text.trim(),
                       sentAt: DateTime.now(),
                       isRead: true,

@@ -9,6 +9,8 @@ import 'terms_conditions_screen.dart';
 import 'banking_details_screen.dart';
 import 'edit_email_screen.dart';
 import 'edit_phone_screen.dart';
+import 'edit_name_screen.dart';
+import 'edit_location_screen.dart';
 import '../data/database_helper.dart';
 
 class LandlordProfileScreen extends StatefulWidget {
@@ -69,44 +71,66 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
 
   Future<void> _loadUserFromDB() async {
     final dbHelper = DatabaseHelper();
-    // Obtienes todos los usuarios (o deberías pasar el ID / Email del que inició sesión)
     final users = await dbHelper.getAll('users');
-    
-    // Obtenemos el correo del usuario actual (o nulo si no hay nadie)
     final currentEmail = currentUserEmailNotifier.value;
+
+    final totalRentals = await dbHelper.getLandlordRentalsCount();
+    final activeTractors = await dbHelper.getLandlordTractorsCount();
+    final rating = await dbHelper.getUserAverageRating();
+    final totalReviews = await dbHelper.getLandlordReviewsCount();
+    final incomeAmount = await dbHelper.getLandlordTotalIncome();
 
     if (users.isNotEmpty && currentEmail != null) {
       try {
         final miUsuario = users.firstWhere((user) => user['email'] == currentEmail);
-        
+        final createdAt = miUsuario['createdAt']?.toString() ?? '';
+        final profilePic = miUsuario['profile_picture']?.toString();
+
+        if (!mounted) return;
         setState(() {
+          if (profilePic != null && profilePic.isNotEmpty) {
+            if (profilePic.startsWith('http')) {
+              _illustrationUrl = profilePic;
+              _imageFile = null;
+            } else {
+              _imageFile = File(profilePic);
+              _illustrationUrl = null;
+            }
+          }
           landlordData = _LandlordProfileData(
-            // Trata de mapear las columnas reales de la base de datos.
             name: miUsuario['name']?.toString() ?? 'Usuario Sin Nombre',
-            location: miUsuario['location']?.toString() ?? 'Sin Ubicación',
+            location: _formatLocation(miUsuario['location']?.toString()),
             email: miUsuario['email']?.toString() ?? 'Sin Correo',
             phone: miUsuario['phone']?.toString() ?? 'Sin Teléfono',
-            totalRentals: 0,
-            totalIncome: '\$0.00',
-            rating: 0.0,
-            registeredSince: miUsuario['createdAt']?.toString().substring(0,4) ?? '2024',
-            activeTractors: 0,
-            totalReviews: 0,
+            totalRentals: totalRentals,
+            totalIncome: '\$${incomeAmount.toStringAsFixed(2)}',
+            rating: double.parse(rating.toStringAsFixed(1)),
+            registeredSince:
+                createdAt.length >= 4 ? createdAt.substring(0, 4) : '2024',
+            activeTractors: activeTractors,
+            totalReviews: totalReviews,
           );
           isLoading = false;
         });
       } catch (e) {
-        // En caso de que firstWhere no encuentre el usuario
+        if (!mounted) return;
         setState(() {
           isLoading = false;
         });
       }
     } else {
-      // Si la base de datos de Windows está vacía, o no hay email guardado, caerá aquí
+      if (!mounted) return;
       setState(() {
         isLoading = false;
       });
     }
+  }
+
+  String _formatLocation(String? location) {
+    if (location == null || location.trim().isEmpty) {
+      return tr('Sin definir', 'Not set');
+    }
+    return location;
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -490,14 +514,34 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
               const SizedBox(height: 24),
               _buildMenuSection(context, tr('Cuenta', 'Account'), [
                 _MenuItem(
-                  icon: Icons.person_outline,
-                  title: tr('Información Personal', 'Personal Information'),
+                  icon: Icons.badge_outlined,
+                  title: tr('Nombre Completo', 'Full Name'),
+                  subtitle: landlordData!.name,
+                  onTap: () async {
+                    final newName = await Navigator.push<String>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            EditNameScreen(currentName: landlordData!.name),
+                      ),
+                    );
+                    if (newName != null && newName.isNotEmpty) {
+                      setState(() {
+                        landlordData!.name = newName;
+                      });
+                    }
+                  },
+                ),
+                _MenuItem(
+                  icon: Icons.mail_outline,
+                  title: tr('Correo electrónico', 'Email'),
                   subtitle: landlordData!.email,
                   onTap: () async {
                     final newEmail = await Navigator.push<String>(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => EditEmailScreen(currentEmail: landlordData!.email),
+                        builder: (context) =>
+                            EditEmailScreen(currentEmail: landlordData!.email),
                       ),
                     );
                     if (newEmail != null && newEmail.isNotEmpty) {
@@ -515,12 +559,33 @@ class _LandlordProfileScreenState extends State<LandlordProfileScreen> {
                     final newPhone = await Navigator.push<String>(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => EditPhoneScreen(currentPhone: landlordData!.phone),
+                        builder: (context) =>
+                            EditPhoneScreen(currentPhone: landlordData!.phone),
                       ),
                     );
                     if (newPhone != null && newPhone.isNotEmpty) {
                       setState(() {
                         landlordData!.phone = newPhone;
+                      });
+                    }
+                  },
+                ),
+                _MenuItem(
+                  icon: Icons.location_on_outlined,
+                  title: tr('Ubicación', 'Location'),
+                  subtitle: landlordData!.location,
+                  onTap: () async {
+                    final newLocation = await Navigator.push<String>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditLocationScreen(
+                          currentLocation: landlordData!.location,
+                        ),
+                      ),
+                    );
+                    if (newLocation != null && newLocation.isNotEmpty) {
+                      setState(() {
+                        landlordData!.location = newLocation;
                       });
                     }
                   },

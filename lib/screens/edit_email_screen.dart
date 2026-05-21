@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../globals.dart';
+import '../data/database_helper.dart';
 
 class EditEmailScreen extends StatefulWidget {
   final String currentEmail;
@@ -13,6 +14,7 @@ class EditEmailScreen extends StatefulWidget {
 
 class _EditEmailScreenState extends State<EditEmailScreen> {
   final _formKey = GlobalKey<FormState>();
+  bool _isSaving = false;
   
   final TextEditingController _currentEmailController = TextEditingController();
   final TextEditingController _newEmailController = TextEditingController();
@@ -32,15 +34,50 @@ class _EditEmailScreenState extends State<EditEmailScreen> {
     super.dispose();
   }
 
-  void _guardarCambios() {
-    if (_formKey.currentState!.validate()) {
+  Future<void> _guardarCambios() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final currentEmail = currentUserEmailNotifier.value;
+    if (currentEmail == null) return;
+
+    final newEmail = _newEmailController.text.trim().toLowerCase();
+    final dbHelper = DatabaseHelper();
+
+    if (await dbHelper.isEmailRegistered(newEmail, excludeEmail: currentEmail)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(tr('Ese correo ya está registrado', 'That email is already registered')),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    final success = await dbHelper.updateUserByEmail(currentEmail, {
+      'email': newEmail,
+    });
+
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+
+    if (success) {
+      currentUserEmailNotifier.value = newEmail;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(tr('Correo actualizado con éxito', 'Email updated successfully')),
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.pop(context, _newEmailController.text);
+      Navigator.pop(context, newEmail);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(tr('No se pudo actualizar el correo', 'Could not update email')),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -182,21 +219,30 @@ class _EditEmailScreenState extends State<EditEmailScreen> {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: _guardarCambios,
+                    onPressed: _isSaving ? null : _guardarCambios,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryColor,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text(
-                      tr('Guardar Información', 'Save Information'),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            tr('Guardar Información', 'Save Information'),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
               ],

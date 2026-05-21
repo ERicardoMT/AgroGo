@@ -175,7 +175,7 @@ class EquipmentCard extends StatelessWidget {
                                   ),
                         ),
                         Text(
-                          tr('/día', '/day'), // TRADUCCIÓN
+                          tr('/hora', '/hr'),
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: AppTheme.textMuted,

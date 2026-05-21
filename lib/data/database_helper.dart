@@ -2,6 +2,8 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:io';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import '../models/chat_message.dart';
+import '../models/message_notification.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -337,5 +339,141 @@ class DatabaseHelper {
       return (result.first['avgRating'] as num).toDouble();
     }
     return 0.0; // Si no hay reseñas, devuelve 0.0
+  }
+
+  // --- Estadísticas del perfil del arrendador ---
+
+  Future<int> getLandlordTractorsCount() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) FROM landlord_equipments');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<int> getLandlordRentalsCount() async {
+    final db = await database;
+    final occupancyCount = Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM rental_occupancies'),
+        ) ??
+        0;
+    if (occupancyCount > 0) return occupancyCount;
+
+    final approvedCount = Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM rental_requests WHERE status = 'approved'",
+          ),
+        ) ??
+        0;
+    if (approvedCount > 0) return approvedCount;
+
+    return Sqflite.firstIntValue(
+          await db.rawQuery(
+            "SELECT COUNT(*) FROM rental_requests WHERE status != 'rejected'",
+          ),
+        ) ??
+        0;
+  }
+
+  Future<double> getLandlordTotalIncome() async {
+    final db = await database;
+    final txResult = await db.rawQuery(
+      "SELECT COALESCE(SUM(netProfit), 0) as total FROM transactions WHERE status = 'completed'",
+    );
+    final txTotal = (txResult.first['total'] as num?)?.toDouble() ?? 0.0;
+    if (txTotal > 0) return txTotal;
+
+    final occResult = await db.rawQuery(
+      'SELECT COALESCE(SUM(rentalCost), 0) as total FROM rental_occupancies',
+    );
+    return (occResult.first['total'] as num?)?.toDouble() ?? 0.0;
+  }
+
+  Future<int> getLandlordReviewsCount() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) FROM reviews');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<bool> updateUserByEmail(
+    String currentEmail,
+    Map<String, dynamic> updates,
+  ) async {
+    final db = await database;
+    final result = await db.update(
+      'users',
+      updates,
+      where: 'email = ?',
+      whereArgs: [currentEmail],
+    );
+    return result > 0;
+  }
+
+  Future<List<MessageNotificationSummary>> getMessageNotificationSummaries(
+    String currentRole,
+  ) async {
+    final db = await database;
+    final rows = await db.query('chat_messages', orderBy: 'sentAt ASC');
+    final Map<String, List<ChatMessage>> grouped = {};
+
+    for (final row in rows) {
+      final msg = ChatMessage.fromJson(row);
+      grouped.putIfAbsent(msg.conversationId, () => []).add(msg);
+    }
+
+    final summaries = <MessageNotificationSummary>[];
+    grouped.forEach((convId, msgs) {
+      final fromOthers =
+          msgs.where((m) => m.senderRole != currentRole).toList();
+      if (fromOthers.isEmpty) return;
+
+      fromOthers.sort((a, b) => b.sentAt.compareTo(a.sentAt));
+      final latest = fromOthers.first;
+      final unread = fromOthers.where((m) => !m.isRead).length;
+      final parts = convId.split('_');
+      final equipmentName =
+          parts.length > 1 ? parts.sublist(1).join('_') : 'Equipo';
+
+      summaries.add(
+        MessageNotificationSummary(
+          conversationId: convId,
+          senderName: latest.senderName,
+          senderRole: latest.senderRole,
+          message: latest.message,
+          sentAt: latest.sentAt,
+          equipmentName: equipmentName,
+          unreadCount: unread,
+        ),
+      );
+    });
+
+    summaries.sort((a, b) => b.sentAt.compareTo(a.sentAt));
+    return summaries;
+  }
+
+  Future<void> markConversationMessagesAsRead(
+    String conversationId,
+    String currentRole,
+  ) async {
+    final db = await database;
+    await db.update(
+      'chat_messages',
+      {'isRead': 1},
+      where: 'conversationId = ? AND senderRole != ?',
+      whereArgs: [conversationId, currentRole],
+    );
+  }
+
+  Future<bool> isEmailRegistered(String email, {String? excludeEmail}) async {
+    final db = await database;
+    final normalized = email.trim().toLowerCase();
+    final result = await db.query(
+      'users',
+      where: excludeEmail == null
+          ? 'email = ?'
+          : 'email = ? AND email != ?',
+      whereArgs: excludeEmail == null
+          ? [normalized]
+          : [normalized, excludeEmail.trim().toLowerCase()],
+    );
+    return result.isNotEmpty;
   }
 }

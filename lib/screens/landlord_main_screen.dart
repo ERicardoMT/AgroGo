@@ -12,7 +12,8 @@ import 'communication_screen.dart';
 import 'landlord_profile_screen.dart';
 import 'notifications_screen.dart'; 
 import '../data/database_helper.dart';
-import 'package:sqflite/sqflite.dart'; // <---
+import '../utils/rental_calculation.dart';
+import 'package:sqflite/sqflite.dart';
 
 class LandlordMainScreen extends StatefulWidget {
   const LandlordMainScreen({super.key});
@@ -92,7 +93,7 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
           startDate: DateTime.parse(map['startDate'].toString()),
           endDate: DateTime.parse(map['endDate'].toString()),
           status: map['status'].toString(),
-          dailyRate: (map['dailyRate'] as num).toDouble(),
+         hourlyRate: ((map['hourlyRate'] ?? map['dailyRate']) as num).toDouble(),
         )).toList();
       } else {
         _loadMockPendingRequests(); // Fallback si no hay datos
@@ -173,8 +174,11 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
     );
 
     if (newStatus == 'approved') {
-      final daysCount = request.endDate.difference(request.startDate).inDays + 1;
-      final rentalCost = daysCount * request.dailyRate;
+      final rentalCost = RentalCalculation.totalCost(
+        request.startDate,
+        request.endDate,
+        request.hourlyRate,
+      );
       
       await db.insert('rental_occupancies', {
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
@@ -835,7 +839,7 @@ class _LandlordMainScreenState extends State<LandlordMainScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  '\$${request.dailyRate}',
+                  '\$${request.hourlyRate}${tr('/hora', '/hr')}',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: AppTheme.accentColor,

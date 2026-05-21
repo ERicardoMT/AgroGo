@@ -14,7 +14,7 @@ class LandlordEquipment {
   final List<String>? imageUrls;
   final String? condition; // 'Excelente', 'Bueno', 'Regular', 'Requiere Mantenimiento'
   final List<Implement>? implements;
-  final double? dailyRate;
+  final double? hourlyRate;
   final DateTime createdAt;
   final DateTime? lastMaintenanceDate;
 
@@ -32,7 +32,7 @@ class LandlordEquipment {
     this.imageUrls,
     this.condition = 'Bueno',
     this.implements,
-    this.dailyRate,
+    this.hourlyRate,
     required this.createdAt,
     this.lastMaintenanceDate,
   });
@@ -54,7 +54,7 @@ class LandlordEquipment {
       implements: (json['implements'] as List?)
           ?.map((e) => Implement.fromJson(e as Map<String, dynamic>))
           .toList(),
-      dailyRate: (json['dailyRate'] as num?)?.toDouble(),
+      hourlyRate: (json['hourlyRate'] ?? json['dailyRate'] as num?)?.toDouble(),
       createdAt: DateTime.parse(json['createdAt'] as String),
       lastMaintenanceDate: json['lastMaintenanceDate'] != null
           ? DateTime.parse(json['lastMaintenanceDate'] as String)
@@ -76,7 +76,8 @@ class LandlordEquipment {
         'imageUrls': imageUrls,
         'condition': condition,
         'implements': implements?.map((e) => e.toJson()).toList(),
-        'dailyRate': dailyRate,
+        'hourlyRate': hourlyRate,
+        'dailyRate': hourlyRate,
         'createdAt': createdAt.toIso8601String(),
         'lastMaintenanceDate': lastMaintenanceDate?.toIso8601String(),
       };
@@ -95,7 +96,7 @@ class LandlordEquipment {
     List<String>? imageUrls,
     String? condition,
     List<Implement>? implements,
-    double? dailyRate,
+    double? hourlyRate,
     DateTime? createdAt,
     DateTime? lastMaintenanceDate,
   }) {
@@ -113,7 +114,7 @@ class LandlordEquipment {
       imageUrls: imageUrls ?? this.imageUrls,
       condition: condition ?? this.condition,
       implements: implements ?? this.implements,
-      dailyRate: dailyRate ?? this.dailyRate,
+      hourlyRate: hourlyRate ?? this.hourlyRate,
       createdAt: createdAt ?? this.createdAt,
       lastMaintenanceDate: lastMaintenanceDate ?? this.lastMaintenanceDate,
     );

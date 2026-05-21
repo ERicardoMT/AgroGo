@@ -1,13 +1,12 @@
+﻿import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../globals.dart';
 import '../theme/app_theme.dart';
 import '../models/landlord_equipment.dart';
 import '../models/implement.dart';
 import '../data/database_helper.dart';
-import 'dart:convert';
-
-import 'landlord_profile_screen.dart';
-import 'notifications_screen.dart';
+import 'equipment_form_screen.dart';
 
 class FleetManagementScreen extends StatefulWidget {
   const FleetManagementScreen({super.key});
@@ -62,7 +61,7 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
           usageHours: (map['usageHours'] as num?)?.toDouble() ?? 0.0,
           isActive: map['isActive'] == 1,
           condition: map['condition']?.toString(),
-          dailyRate: (map['dailyRate'] as num?)?.toDouble(),
+          hourlyRate: (map['hourlyRate'] ?? map['dailyRate'] as num?)?.toDouble(),
           createdAt: DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now(),
           lastMaintenanceDate: map['lastMaintenanceDate'] != null ? DateTime.tryParse(map['lastMaintenanceDate'].toString()) : null,
           imageUrls: imgList,
@@ -89,7 +88,7 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
         'imageUrls': eq.imageUrls != null ? jsonEncode(eq.imageUrls) : null,
         'condition': eq.condition,
         'implements': eq.implements != null ? jsonEncode(eq.implements!.map((i) => i.toJson()).toList()) : null,
-        'dailyRate': eq.dailyRate,
+        'dailyRate': eq.hourlyRate,
         'createdAt': eq.createdAt.toIso8601String(),
         'lastMaintenanceDate': eq.lastMaintenanceDate?.toIso8601String(),
     };
@@ -112,7 +111,7 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
         'imageUrls': eq.imageUrls != null ? jsonEncode(eq.imageUrls) : null,
         'condition': eq.condition,
         'implements': eq.implements != null ? jsonEncode(eq.implements!.map((i) => i.toJson()).toList()) : null,
-        'dailyRate': eq.dailyRate,
+        'dailyRate': eq.hourlyRate,
         'lastMaintenanceDate': eq.lastMaintenanceDate?.toIso8601String(),
     };
     await dbHelper.update('landlord_equipments', map, eq.id);
@@ -128,34 +127,43 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
     await _updateEquipmentInDB(updatedEq);
   }
 
-  void _showAddEquipmentDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => _AddEquipmentDialog(
-        onAdd: (newEquipment) async {
-          setState(() {
-            equipment.add(newEquipment);
-          });
-          await _saveEquipmentToDB(newEquipment);
-        },
+  Future<void> _showAddEquipmentDialog() async {
+    final result = await Navigator.push<LandlordEquipment>(
+      context,
+      MaterialPageRoute(builder: (_) => const EquipmentFormScreen()),
+    );
+    if (result == null || !mounted) return;
+    setState(() => equipment.add(result));
+    await _saveEquipmentToDB(result);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(
+          tr('Tractor agregado exitosamente', 'Tractor added successfully'),
+        ),
       ),
     );
   }
 
-  void _showEquipmentDetails(LandlordEquipment eq) {
-    showDialog(
-      context: context,
-      builder: (context) => _EquipmentDetailsDialog(
-        equipment: eq,
-        onUpdate: (updatedEquipment) async {
-          setState(() {
-            final index = equipment.indexWhere((e) => e.id == eq.id);
-            if (index != -1) {
-              equipment[index] = updatedEquipment;
-            }
-          });
-          await _updateEquipmentInDB(updatedEquipment);
-        },
+  Future<void> _showEquipmentDetails(LandlordEquipment eq) async {
+    final result = await Navigator.push<LandlordEquipment>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => EquipmentFormScreen(equipment: eq),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      final index = equipment.indexWhere((e) => e.id == eq.id);
+      if (index != -1) equipment[index] = result;
+    });
+    await _updateEquipmentInDB(result);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        content: Text(tr('Cambios guardados', 'Changes saved')),
       ),
     );
   }
@@ -182,7 +190,7 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
                 SnackBar(
                   behavior: SnackBarBehavior.floating,
                   content: Text(
-                    tr('Filtros pendiente de implementación',
+                    tr('Filtros pendiente de implementaciÃ³n',
                         'Filters pending implementation'),
                   ),
                 ),
@@ -282,24 +290,12 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
         ),
         child: Column(
           children: [
-            // Imagen placeholder
-            Container(
-              width: double.infinity,
-              height: 160,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(isDark ? 0.15 : 0.1),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
               ),
-              child: Center(
-                child: Icon(
-                  Icons.agriculture_rounded,
-                  size: 60,
-                  color: AppTheme.primaryColor.withOpacity(0.6),
-                ),
-              ),
+              child: _buildEquipmentImage(eq, isDark),
             ),
             Padding(
               padding: const EdgeInsets.all(16),
@@ -441,7 +437,7 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
                           Padding(
                             padding: const EdgeInsets.only(top: 6),
                             child: Text(
-                              tr('+${eq.implements!.length - 3} más',
+                              tr('+${eq.implements!.length - 3} mÃ¡s',
                                   '+${eq.implements!.length - 3} more'),
                               style: Theme.of(context)
                                   .textTheme
@@ -455,7 +451,7 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
                         const SizedBox(height: 12),
                       ],
                     ),
-                  // Botones de acción
+                  // Botones de acciÃ³n
                   Row(
                     children: [
                       Expanded(
@@ -504,6 +500,36 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
     );
   }
 
+  Widget _buildEquipmentImage(LandlordEquipment eq, bool isDark) {
+    final imagePath =
+        eq.imageUrls != null && eq.imageUrls!.isNotEmpty ? eq.imageUrls!.first : null;
+
+    return Container(
+      width: double.infinity,
+      height: 160,
+      color: AppTheme.primaryColor.withOpacity(isDark ? 0.15 : 0.1),
+      child: imagePath != null
+          ? Image.file(
+              File(imagePath),
+              width: double.infinity,
+              height: 160,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _equipmentPlaceholder(),
+            )
+          : _equipmentPlaceholder(),
+    );
+  }
+
+  Widget _equipmentPlaceholder() {
+    return Center(
+      child: Icon(
+        Icons.agriculture_rounded,
+        size: 60,
+        color: AppTheme.primaryColor.withOpacity(0.6),
+      ),
+    );
+  }
+
   Widget _buildSpecBadge({
     required IconData icon,
     required String label,
@@ -528,506 +554,6 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
                 ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _AddEquipmentDialog extends StatefulWidget {
-  final Function(LandlordEquipment) onAdd;
-
-  const _AddEquipmentDialog({required this.onAdd});
-
-  @override
-  State<_AddEquipmentDialog> createState() => _AddEquipmentDialogState();
-}
-
-class _AddEquipmentDialogState extends State<_AddEquipmentDialog> {
-  final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
-  late TextEditingController _brandController;
-  late TextEditingController _modelController;
-  late TextEditingController _yearController;
-  late TextEditingController _powerController;
-  late TextEditingController _hoursController;
-  late TextEditingController _dailyRateController;
-
-  String _selectedTransmission = 'Manual';
-  String _selectedTraction = '4WD';
-  String _selectedCondition = 'Bueno';
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController();
-    _brandController = TextEditingController();
-    _modelController = TextEditingController();
-    _yearController = TextEditingController(text: DateTime.now().year.toString());
-    _powerController = TextEditingController();
-    _hoursController = TextEditingController(text: '0');
-    _dailyRateController = TextEditingController();
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _brandController.dispose();
-    _modelController.dispose();
-    _yearController.dispose();
-    _powerController.dispose();
-    _hoursController.dispose();
-    _dailyRateController.dispose();
-    super.dispose();
-  }
-
-  void _submitForm() {
-    if (!_formKey.currentState!.validate()) return;
-
-    final newEquipment = LandlordEquipment(
-      id: 'E${DateTime.now().millisecondsSinceEpoch}',
-      name: _nameController.text,
-      brand: _brandController.text,
-      model: _modelController.text,
-      year: int.parse(_yearController.text),
-      power: double.parse(_powerController.text),
-      transmission: _selectedTransmission,
-      traction: _selectedTraction,
-      usageHours: double.parse(_hoursController.text),
-      condition: _selectedCondition,
-      isActive: true,
-      dailyRate: double.tryParse(_dailyRateController.text) ?? 0.0,
-      createdAt: DateTime.now(),
-    );
-
-    widget.onAdd(newEquipment);
-    Navigator.pop(context);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text(tr('Tractor agregado exitosamente',
-            'Tractor added successfully')),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return AlertDialog(
-      title: Text(tr('Agregar Nuevo Tractor', 'Add New Tractor')),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: tr('Nombre', 'Name'),
-                  hintText: tr('ej. Tractor Principal', 'e.g. Main Tractor'),
-                ),
-                validator: (value) =>
-                    value?.isEmpty ?? true ? tr('Requerido', 'Required') : null,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _brandController,
-                      decoration: InputDecoration(
-                        labelText: tr('Marca', 'Brand'),
-                        hintText: 'John Deere',
-                      ),
-                      validator: (value) =>
-                          value?.isEmpty ?? true
-                              ? tr('Requerido', 'Required')
-                              : null,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _modelController,
-                      decoration: InputDecoration(
-                        labelText: tr('Modelo', 'Model'),
-                        hintText: '5075E',
-                      ),
-                      validator: (value) =>
-                          value?.isEmpty ?? true
-                              ? tr('Requerido', 'Required')
-                              : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _yearController,
-                      decoration: InputDecoration(
-                        labelText: tr('Año', 'Year'),
-                      ),
-                      keyboardType: TextInputType.number,
-                      validator: (value) =>
-                          value?.isEmpty ?? true
-                              ? tr('Requerido', 'Required')
-                              : null,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _powerController,
-                      decoration: InputDecoration(
-                        labelText: tr('Potencia (HP)', 'Power (HP)'),
-                      ),
-                      keyboardType:
-                          const TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) =>
-                          value?.isEmpty ?? true
-                              ? tr('Requerido', 'Required')
-                              : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: _selectedTransmission,
-                decoration: InputDecoration(
-                  labelText: tr('Transmisión', 'Transmission'),
-                ),
-                items: ['Manual', 'Automática', 'CVT']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (value) =>
-                    setState(() => _selectedTransmission = value ?? 'Manual'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: _selectedTraction,
-                decoration: InputDecoration(
-                  labelText: tr('Tracción', 'Traction'),
-                ),
-                items: ['2WD', '4WD', 'AWD']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (value) =>
-                    setState(() => _selectedTraction = value ?? '4WD'),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _hoursController,
-                decoration: InputDecoration(
-                  labelText: tr('Horas de uso', 'Usage hours'),
-                ),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                validator: (value) =>
-                    value?.isEmpty ?? true
-                        ? tr('Requerido', 'Required')
-                        : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _dailyRateController,
-                decoration: InputDecoration(
-                  labelText: tr('Tarifa diaria (\$)', 'Daily rate (\$)'),
-                ),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                value: _selectedCondition,
-                decoration: InputDecoration(
-                  labelText: tr('Condición', 'Condition'),
-                ),
-                items: ['Excelente', 'Bueno', 'Regular', 'Requiere Mantenimiento']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (value) =>
-                    setState(() => _selectedCondition = value ?? 'Bueno'),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                tr(
-                  'Nota: Las imágenes pueden agregarse desde la edición del tractor',
-                  'Note: Images can be added from tractor editing',
-                ),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey[600],
-                      fontStyle: FontStyle.italic,
-                    ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(tr('Cancelar', 'Cancel')),
-        ),
-        ElevatedButton(
-          onPressed: _submitForm,
-          child: Text(tr('Agregar', 'Add')),
-        ),
-      ],
-    );
-  }
-}
-
-class _EquipmentDetailsDialog extends StatefulWidget {
-  final LandlordEquipment equipment;
-  final Function(LandlordEquipment) onUpdate;
-
-  const _EquipmentDetailsDialog({
-    required this.equipment,
-    required this.onUpdate,
-  });
-
-  @override
-  State<_EquipmentDetailsDialog> createState() =>
-      _EquipmentDetailsDialogState();
-}
-
-class _EquipmentDetailsDialogState extends State<_EquipmentDetailsDialog> {
-  late TextEditingController _dailyRateController;
-  late List<Implement> _implements;
-  final TextEditingController _implementNameController = TextEditingController();
-  final TextEditingController _implementTypeController = TextEditingController();
-  String _selectedImplementType = 'rastra';
-
-  @override
-  void initState() {
-    super.initState();
-    _dailyRateController =
-        TextEditingController(text: widget.equipment.dailyRate?.toString() ?? '');
-    _implements = [...(widget.equipment.implements ?? [])];
-  }
-
-  @override
-  void dispose() {
-    _dailyRateController.dispose();
-    _implementNameController.dispose();
-    _implementTypeController.dispose();
-    super.dispose();
-  }
-
-  void _addImplement() {
-    if (_implementNameController.text.isEmpty) return;
-
-    final newImplement = Implement(
-      id: 'I${DateTime.now().millisecondsSinceEpoch}',
-      name: _implementNameController.text,
-      type: _selectedImplementType,
-    );
-
-    setState(() {
-      _implements.add(newImplement);
-    });
-
-    _implementNameController.clear();
-    _implementTypeController.clear();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text(tr('Implemento agregado', 'Implement added')),
-      ),
-    );
-  }
-
-  void _removeImplement(int index) {
-    setState(() {
-      _implements.removeAt(index);
-    });
-  }
-
-  void _saveChanges() {
-    final updatedEquipment = widget.equipment.copyWith(
-      dailyRate: double.tryParse(_dailyRateController.text),
-      implements: _implements,
-    );
-
-    widget.onUpdate(updatedEquipment);
-    Navigator.pop(context);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text(tr('Cambios guardados', 'Changes saved')),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Dialog(
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                tr('Editar Tractor', 'Edit Tractor'),
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 20),
-              // Tarifa diaria
-              TextField(
-                controller: _dailyRateController,
-                decoration: InputDecoration(
-                  labelText: tr('Tarifa diaria (\$)', 'Daily rate (\$)'),
-                  prefixText: '\$ ',
-                  border: const OutlineInputBorder(),
-                ),
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-              ),
-              const SizedBox(height: 20),
-              // Gestión de implementos
-              Text(
-                tr('Implementos (Opcional)', 'Implements (Optional)'),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 12),
-              // Lista de implementos actuales
-              if (_implements.isNotEmpty)
-                Column(
-                  children: [
-                    ..._implements.asMap().entries.map((entry) {
-                      final impl = entry.value;
-                      final idx = entry.key;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppTheme.accentColor.withOpacity(
-                            isDark ? 0.1 : 0.05,
-                          ),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: AppTheme.accentColor.withOpacity(0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment:
-                              MainAxisAlignment.spaceBetween,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    impl.name,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    impl.type,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .labelSmall
-                                        ?.copyWith(
-                                          color: Colors.grey[600],
-                                        ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () =>
-                                  _removeImplement(idx),
-                              icon: const Icon(Icons.delete_outline_rounded),
-                              color: Colors.red,
-                              iconSize: 20,
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 12),
-                  ],
-                ),
-              // Formulario para agregar implemento
-              Text(
-                tr('Agregar nuevo implemento', 'Add new implement'),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: _implementNameController,
-                decoration: InputDecoration(
-                  labelText: tr('Nombre', 'Name'),
-                  hintText: tr('ej. Rastra de 3m', 'e.g. 3m harrow'),
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: _selectedImplementType,
-                decoration: InputDecoration(
-                  labelText: tr('Tipo', 'Type'),
-                  border: const OutlineInputBorder(),
-                ),
-                items: ['rastra', 'arado', 'sembradora', 'otro']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (value) =>
-                    setState(() => _selectedImplementType = value ?? 'rastra'),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _addImplement,
-                  icon: const Icon(Icons.add_rounded),
-                  label: Text(tr('Agregar Implemento', 'Add Implement')),
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Botones finales
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: Text(tr('Cancelar', 'Cancel')),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _saveChanges,
-                    child: Text(tr('Guardar', 'Save')),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

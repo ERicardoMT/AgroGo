@@ -275,7 +275,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                       _buildPriceOption(
                         context,
                         index: 0,
-                        label: tr('Por día', 'Per day'), // TRADUCCIÓN
+                        label: tr('Por hora', 'Per hour'),
                         price: equipment.pricePerDay,
                       ),
                       const SizedBox(width: 12),
@@ -411,7 +411,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   Text(
-                    '\$${equipment.pricePerDay.toStringAsFixed(0)}${tr('/día', '/day')}', // TRADUCCIÓN
+                    '\$${equipment.pricePerDay.toStringAsFixed(0)}${tr('/hora', '/hr')}',
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           color: AppTheme.primaryColor,
                           fontWeight: FontWeight.bold,

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import '../globals.dart';
+import '../data/database_helper.dart';
 
 class EditPhoneScreen extends StatefulWidget {
   final String currentPhone;
@@ -13,6 +15,7 @@ class EditPhoneScreen extends StatefulWidget {
 
 class _EditPhoneScreenState extends State<EditPhoneScreen> {
   final _formKey = GlobalKey<FormState>();
+  bool _isSaving = false;
   
   final TextEditingController _currentPhoneController = TextEditingController();
   final TextEditingController _newPhoneController = TextEditingController();
@@ -32,15 +35,35 @@ class _EditPhoneScreenState extends State<EditPhoneScreen> {
     super.dispose();
   }
 
-  void _guardarCambios() {
-    if (_formKey.currentState!.validate()) {
+  Future<void> _guardarCambios() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final currentEmail = currentUserEmailNotifier.value;
+    if (currentEmail == null) return;
+
+    setState(() => _isSaving = true);
+    final success = await DatabaseHelper().updateUserByEmail(currentEmail, {
+      'phone': _newPhoneController.text.trim(),
+    });
+
+    if (!mounted) return;
+    setState(() => _isSaving = false);
+
+    if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(tr('Teléfono actualizado con éxito', 'Phone updated successfully')),
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.pop(context, _newPhoneController.text);
+      Navigator.pop(context, _newPhoneController.text.trim());
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(tr('No se pudo actualizar el teléfono', 'Could not update phone')),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -110,6 +133,8 @@ class _EditPhoneScreenState extends State<EditPhoneScreen> {
                 TextFormField(
                   controller: _newPhoneController,
                   keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   style: TextStyle(color: isDark ? Colors.white : Colors.black),
                   decoration: InputDecoration(
                     labelText: tr('Teléfono nuevo', 'New phone'),
@@ -134,6 +159,9 @@ class _EditPhoneScreenState extends State<EditPhoneScreen> {
                     if (value == null || value.isEmpty) {
                       return tr('Por favor ingresa tu nuevo teléfono', 'Please enter your new phone');
                     }
+                    if (value.length < 10) {
+                      return tr('Ingresa 10 dígitos', 'Enter 10 digits');
+                    }
                     return null;
                   },
                 ),
@@ -143,6 +171,8 @@ class _EditPhoneScreenState extends State<EditPhoneScreen> {
                 TextFormField(
                   controller: _confirmPhoneController,
                   keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                   style: TextStyle(color: isDark ? Colors.white : Colors.black),
                   decoration: InputDecoration(
                     labelText: tr('Confirmar teléfono nuevo', 'Confirm new phone'),
@@ -179,21 +209,30 @@ class _EditPhoneScreenState extends State<EditPhoneScreen> {
                   width: double.infinity,
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: _guardarCambios,
+                    onPressed: _isSaving ? null : _guardarCambios,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryColor,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text(
-                      tr('Guardar Información', 'Save Information'),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
+                    child: _isSaving
+                        ? const SizedBox(
+                            height: 22,
+                            width: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(
+                            tr('Guardar Información', 'Save Information'),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                   ),
                 ),
               ],

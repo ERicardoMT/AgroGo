@@ -4,7 +4,8 @@ import '../theme/app_theme.dart';
 import '../models/rental_request.dart';
 import '../models/rental_occupancy.dart';
 import '../data/database_helper.dart';
-import 'package:sqflite/sqflite.dart'; // <--- Añadimos este import
+import '../utils/rental_calculation.dart';
+import 'package:sqflite/sqflite.dart';
 
 import 'landlord_profile_screen.dart';
 import 'notifications_screen.dart';
@@ -55,7 +56,7 @@ bool isLoading = true;
           startDate: DateTime.tryParse(map['startDate'].toString()) ?? DateTime.now(),
           endDate: DateTime.tryParse(map['endDate'].toString()) ?? DateTime.now(),
           status: map['status'].toString(),
-          dailyRate: (map['dailyRate'] as num?)?.toDouble() ?? 0.0,
+          hourlyRate: (map['hourlyRate'] ?? map['dailyRate'] as num?)?.toDouble() ?? 0.0,
           notes: map['notes']?.toString(),
         );
       }).toList();
@@ -94,8 +95,11 @@ bool isLoading = true;
 
     // Si fue aprobado, lo agregamos como un occupancy activo para el calendario y mis rentas
     if (newStatus == 'approved') {
-      final daysCount = request.endDate.difference(request.startDate).inDays + 1;
-      final rentalCost = daysCount * request.dailyRate;
+      final rentalCost = RentalCalculation.totalCost(
+        request.startDate,
+        request.endDate,
+        request.hourlyRate,
+      );
       
       await db.insert('rental_occupancies', {
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
@@ -429,12 +433,12 @@ bool isLoading = true;
               _buildInfoBadge(
                 icon: Icons.schedule_rounded,
                 label:
-                    '${request.endDate.difference(request.startDate).inDays} días',
+                    '${request.hoursCount} ${tr('horas', 'hours')}',
                 isDark: isDark,
               ),
               _buildInfoBadge(
                 icon: Icons.attach_money_rounded,
-                label: '\$${request.dailyRate}/día',
+                label: '\$${request.hourlyRate}${tr('/hora', '/hr')}',
                 isDark: isDark,
               ),
             ],
@@ -700,7 +704,7 @@ bool isLoading = true;
               const Spacer(),
               if (rental.rentalCost != null)
                 Text(
-                  '\$${rental.rentalCost}/día',
+                  '\$${rental.rentalCost?.toStringAsFixed(0) ?? '0'}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.w600,
                     color: AppTheme.primaryColor,
@@ -737,7 +741,10 @@ bool isLoading = true;
   }
 
   Widget _buildOccupancyTimeline(RentalOccupancy occupancy, bool isDark) {
-    final duration = occupancy.endDate.difference(occupancy.startDate).inDays;
+    final duration = RentalCalculation.hoursBetween(
+      occupancy.startDate,
+      occupancy.endDate,
+    );
     final isActive = occupancy.isActive;
 
     return Container(
@@ -814,7 +821,7 @@ bool isLoading = true;
                         ),
                       ),
                       Text(
-                        '($duration ${tr("días", "days")})',
+                        '($duration ${tr("horas", "hours")})',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: isDark ? Colors.grey[500] : Colors.grey[600],
                         ),

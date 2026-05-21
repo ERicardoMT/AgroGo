@@ -22,6 +22,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _locationController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -30,6 +31,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _locationController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -65,7 +67,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       'phone': _phoneController.text.trim(),
       'password': _passwordController.text, 
       'role': _selectedRole,
-      'location': 'Sin definir',
+      'location': _locationController.text.trim(),
       'favorites': '[]',
       'createdAt': DateTime.now().toIso8601String(),
     };
@@ -181,6 +183,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         counterText: '', // <--- Oculta el contador de "0/10" para que se vea limpio
                       ),
                       validator: (value) => value == null || value.length < 10 ? tr('Ingresa 10 dígitos', 'Enter 10 digits') : null,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _locationController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        labelText: tr('Ubicación (Ciudad, Estado)', 'Location (City, State)'),
+                        prefixIcon: const Icon(Icons.location_on_outlined),
+                      ),
+                      validator: (value) =>
+                          value == null || value.trim().isEmpty
+                              ? tr('Campo requerido', 'Required field')
+                              : null,
                     ),
                     const SizedBox(height: 16),
 

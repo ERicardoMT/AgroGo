@@ -91,19 +91,32 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
+  Future<String> _getCurrentUserName() async {
+    final email = currentUserEmailNotifier.value;
+    if (email == null) return tr('Usuario', 'User');
+    final users = await DatabaseHelper().getAll('users');
+    try {
+      final user = users.firstWhere((u) => u['email'] == email);
+      return user['name']?.toString() ?? tr('Usuario', 'User');
+    } catch (_) {
+      return tr('Usuario', 'User');
+    }
+  }
+
   void _sendMessage() async {
     if (_messageController.text.trim().isEmpty) return;
 
+    final senderName = await _getCurrentUserName();
     final newMessage = ChatMessage(
       id: 'M_${DateTime.now().millisecondsSinceEpoch}',
       conversationId: _conversationId,
-      senderId: currentUserEmailNotifier.value ?? 'me', // Current user
-      senderName: 'Yo',
+      senderId: currentUserEmailNotifier.value ?? 'me',
+      senderName: senderName,
       senderRole: userRoleNotifier.value,
       message: _messageController.text.trim(),
       sentAt: DateTime.now(),
-      isRead: true,
-      imageUrl: null, // ensure this is defined locally
+      isRead: false,
+      imageUrl: null,
     );
 
     // Save to DB

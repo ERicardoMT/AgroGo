@@ -4,6 +4,7 @@ import '../models/equipment.dart';
 import '../theme/app_theme.dart';
 import '../globals.dart'; // <--- IMPORT GLOBAL
 import '../data/database_helper.dart';
+import '../utils/rental_calculation.dart';
 
 class BookingBottomSheet extends StatefulWidget {
   final Equipment equipment;
@@ -20,20 +21,14 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
   bool _isLoading = false;
   bool _isSuccess = false;
 
-  int get _daysCount {
+  int get _hoursCount {
     if (_startDate == null || _endDate == null) return 0;
-    return _endDate!.difference(_startDate!).inDays + 1;
+    return RentalCalculation.hoursBetween(_startDate!, _endDate!);
   }
 
   double get _totalPrice {
-    if (_daysCount <= 0) return 0;
-    if (_daysCount >= 30) {
-      return widget.equipment.pricePerMonth * (_daysCount / 30);
-    } else if (_daysCount >= 7) {
-      return widget.equipment.pricePerWeek * (_daysCount / 7);
-    } else {
-      return widget.equipment.pricePerDay * _daysCount;
-    }
+    if (_hoursCount <= 0) return 0;
+    return widget.equipment.pricePerDay * _hoursCount;
   }
 
   Future<void> _selectDate(bool isStart) async {
@@ -96,6 +91,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
       'endDate': _endDate!.toIso8601String(),
       'status': 'pending',
       'dailyRate': widget.equipment.pricePerDay,
+      'hourlyRate': widget.equipment.pricePerDay,
       'notes': 'Reserva solicitada desde la App',
     };
 
@@ -232,7 +228,7 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
             ],
           ),
 
-          if (_daysCount > 0) ...[
+          if (_hoursCount > 0) ...[
             const SizedBox(height: 24),
 
             // Summary
@@ -246,12 +242,12 @@ class _BookingBottomSheetState extends State<BookingBottomSheet> {
                 children: [
                   _buildSummaryRow(
                     tr('Duración', 'Duration'), // TRADUCCIÓN
-                    tr('$_daysCount días', '$_daysCount days'), // TRADUCCIÓN
+                    tr('$_hoursCount horas', '$_hoursCount hours'),
                   ),
                   const SizedBox(height: 8),
                   _buildSummaryRow(
                     tr('Precio base', 'Base price'), // TRADUCCIÓN
-                    '\$${widget.equipment.pricePerDay.toStringAsFixed(0)}${tr('/día', '/day')}', // TRADUCCIÓN
+                    '\$${widget.equipment.pricePerDay.toStringAsFixed(0)}${tr('/hora', '/hr')}',
                   ),
                   const Divider(height: 24),
                   _buildSummaryRow(
