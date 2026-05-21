@@ -72,50 +72,125 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
     });
   }
 
-  Future<void> _saveEquipmentToDB(LandlordEquipment eq) async {
-    final dbHelper = DatabaseHelper();
-    final map = {
-        'id': eq.id,
-        'name': eq.name,
-        'brand': eq.brand,
-        'model': eq.model,
-        'year': eq.year,
-        'power': eq.power,
-        'transmission': eq.transmission,
-        'traction': eq.traction,
-        'usageHours': eq.usageHours,
-        'isActive': eq.isActive ? 1 : 0,
-        'imageUrls': eq.imageUrls != null ? jsonEncode(eq.imageUrls) : null,
-        'condition': eq.condition,
-        'implements': eq.implements != null ? jsonEncode(eq.implements!.map((i) => i.toJson()).toList()) : null,
-        'dailyRate': eq.hourlyRate,
-        'createdAt': eq.createdAt.toIso8601String(),
-        'lastMaintenanceDate': eq.lastMaintenanceDate?.toIso8601String(),
-    };
-    await dbHelper.insert('landlord_equipments', map);
-  }
+Future<void> _saveEquipmentToDB(LandlordEquipment eq) async {
+  final dbHelper = DatabaseHelper();
 
-  Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
-    final dbHelper = DatabaseHelper();
-    final map = {
-        'id': eq.id,
-        'name': eq.name,
-        'brand': eq.brand,
-        'model': eq.model,
-        'year': eq.year,
-        'power': eq.power,
-        'transmission': eq.transmission,
-        'traction': eq.traction,
-        'usageHours': eq.usageHours,
-        'isActive': eq.isActive ? 1 : 0,
-        'imageUrls': eq.imageUrls != null ? jsonEncode(eq.imageUrls) : null,
-        'condition': eq.condition,
-        'implements': eq.implements != null ? jsonEncode(eq.implements!.map((i) => i.toJson()).toList()) : null,
-        'dailyRate': eq.hourlyRate,
-        'lastMaintenanceDate': eq.lastMaintenanceDate?.toIso8601String(),
-    };
-    await dbHelper.update('landlord_equipments', map, eq.id);
-  }
+  final landlordMap = {
+    'id': eq.id,
+    'name': eq.name,
+    'brand': eq.brand,
+    'model': eq.model,
+    'year': eq.year,
+    'power': eq.power,
+    'transmission': eq.transmission,
+    'traction': eq.traction,
+    'usageHours': eq.usageHours,
+    'isActive': eq.isActive ? 1 : 0,
+    'imageUrls': eq.imageUrls != null ? jsonEncode(eq.imageUrls) : null,
+    'condition': eq.condition,
+    'implements': eq.implements != null
+        ? jsonEncode(eq.implements!.map((i) => i.toJson()).toList())
+        : null,
+    'dailyRate': eq.hourlyRate,
+    'createdAt': eq.createdAt.toIso8601String(),
+    'lastMaintenanceDate': eq.lastMaintenanceDate?.toIso8601String(),
+  };
+
+  await dbHelper.insert('landlord_equipments', landlordMap);
+
+  // Sincronización con el catálogo público que ve el rentador.
+  // Optimización local: reutilizamos el mismo id del tractor para evitar duplicados.
+  final publicEquipmentMap = {
+    'id': eq.id,
+    'name': eq.name,
+    'category': 'Tractores',
+    'description':
+        '${eq.brand} ${eq.model} ${eq.year}. Potencia: ${eq.power.toStringAsFixed(0)} HP. Transmisión: ${eq.transmission}. Tracción: ${eq.traction}.',
+    'location': 'Ubicación del arrendador',
+    'pricePerDay': eq.hourlyRate ?? 0.0,
+    'pricePerWeek': (eq.hourlyRate ?? 0.0) * 7,
+    'pricePerMonth': (eq.hourlyRate ?? 0.0) * 30,
+    'rating': 4.8,
+    'reviewCount': 0,
+    'available': eq.isActive ? 1 : 0,
+    'ownerId': 'arrendador_local',
+    'ownerName': 'Arrendador AgroGo',
+    'images': eq.imageUrls != null && eq.imageUrls!.isNotEmpty
+        ? eq.imageUrls!.first
+        : '',
+    'specs': jsonEncode({
+      'Marca': eq.brand,
+      'Modelo': eq.model,
+      'Año': eq.year.toString(),
+      'Potencia': '${eq.power.toStringAsFixed(0)} HP',
+      'Transmisión': eq.transmission,
+      'Tracción': eq.traction,
+      'Horas de uso': '${eq.usageHours.toStringAsFixed(0)} h',
+      'Condición': eq.condition ?? 'Buena',
+    }),
+  };
+
+  await dbHelper.insert('equipments', publicEquipmentMap);
+}
+
+Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
+  final dbHelper = DatabaseHelper();
+
+  final landlordMap = {
+    'id': eq.id,
+    'name': eq.name,
+    'brand': eq.brand,
+    'model': eq.model,
+    'year': eq.year,
+    'power': eq.power,
+    'transmission': eq.transmission,
+    'traction': eq.traction,
+    'usageHours': eq.usageHours,
+    'isActive': eq.isActive ? 1 : 0,
+    'imageUrls': eq.imageUrls != null ? jsonEncode(eq.imageUrls) : null,
+    'condition': eq.condition,
+    'implements': eq.implements != null
+        ? jsonEncode(eq.implements!.map((i) => i.toJson()).toList())
+        : null,
+    'dailyRate': eq.hourlyRate,
+    'lastMaintenanceDate': eq.lastMaintenanceDate?.toIso8601String(),
+  };
+
+  await dbHelper.update('landlord_equipments', landlordMap, eq.id);
+
+  // Actualiza también el catálogo público para que el rentador vea cambios.
+  final publicEquipmentMap = {
+    'id': eq.id,
+    'name': eq.name,
+    'category': 'Tractores',
+    'description':
+        '${eq.brand} ${eq.model} ${eq.year}. Potencia: ${eq.power.toStringAsFixed(0)} HP. Transmisión: ${eq.transmission}. Tracción: ${eq.traction}.',
+    'location': 'Ubicación del arrendador',
+    'pricePerDay': eq.hourlyRate ?? 0.0,
+    'pricePerWeek': (eq.hourlyRate ?? 0.0) * 7,
+    'pricePerMonth': (eq.hourlyRate ?? 0.0) * 30,
+    'rating': 4.8,
+    'reviewCount': 0,
+    'available': eq.isActive ? 1 : 0,
+    'ownerId': 'arrendador_local',
+    'ownerName': 'Arrendador AgroGo',
+    'images': eq.imageUrls != null && eq.imageUrls!.isNotEmpty
+        ? eq.imageUrls!.first
+        : '',
+    'specs': jsonEncode({
+      'Marca': eq.brand,
+      'Modelo': eq.model,
+      'Año': eq.year.toString(),
+      'Potencia': '${eq.power.toStringAsFixed(0)} HP',
+      'Transmisión': eq.transmission,
+      'Tracción': eq.traction,
+      'Horas de uso': '${eq.usageHours.toStringAsFixed(0)} h',
+      'Condición': eq.condition ?? 'Buena',
+    }),
+  };
+
+  await dbHelper.insert('equipments', publicEquipmentMap);
+}
 
   Future<void> _toggleEquipmentAvailability(int index) async {
     final updatedEq = equipment[index].copyWith(
