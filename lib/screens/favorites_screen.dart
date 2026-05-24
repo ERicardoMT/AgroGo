@@ -1,11 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import '../data/mock_data.dart';
+
+import '../data/database_helper.dart';
+import '../globals.dart';
+import '../models/equipment.dart';
 import '../theme/app_theme.dart';
 import '../widgets/equipment_card.dart';
 import 'equipment_detail_screen.dart';
-import '../globals.dart'; // <--- IMPORT GLOBAL
 
-class FavoritesScreen extends StatelessWidget {
+class FavoritesScreen extends StatefulWidget {
   final Set<String> favoriteIds;
   final Function(String) onToggleFavorite;
 
@@ -16,12 +20,106 @@ class FavoritesScreen extends StatelessWidget {
   });
 
   @override
+  State<FavoritesScreen> createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends State<FavoritesScreen> {
+  final DatabaseHelper _db = DatabaseHelper();
+
+  bool _isLoading = true;
+  List<Equipment> _favoriteEquipment = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavorites();
+  }
+
+  @override
+  void didUpdateWidget(covariant FavoritesScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.favoriteIds.length != widget.favoriteIds.length ||
+        oldWidget.favoriteIds.difference(widget.favoriteIds).isNotEmpty ||
+        widget.favoriteIds.difference(oldWidget.favoriteIds).isNotEmpty) {
+      _loadFavorites();
+    }
+  }
+
+  Future<void> _loadFavorites() async {
+    final userId = currentUserEmailNotifier.value;
+
+    if (userId == null) {
+      if (!mounted) return;
+
+      setState(() {
+        _favoriteEquipment = [];
+        _isLoading = false;
+      });
+
+      return;
+    }
+
+    final rows = await _db.getFavoriteEquipmentsForUser(userId);
+
+    final parsed = rows.map(_equipmentFromDb).toList();
+
+    if (!mounted) return;
+
+    setState(() {
+      _favoriteEquipment = parsed;
+      _isLoading = false;
+    });
+  }
+
+  Equipment _equipmentFromDb(Map<String, dynamic> row) {
+    Map<String, String> parsedSpecs = {};
+
+    final rawSpecs = row['specs']?.toString();
+
+    if (rawSpecs != null && rawSpecs.trim().isNotEmpty) {
+      try {
+        parsedSpecs = Map<String, String>.from(jsonDecode(rawSpecs));
+      } catch (_) {
+        parsedSpecs = {};
+      }
+    }
+
+    final image = row['images']?.toString() ?? '';
+
+    return Equipment(
+      id: row['id']?.toString() ?? '',
+      name: row['name']?.toString() ?? 'Sin nombre',
+      category: row['category']?.toString() ?? 'General',
+      description: row['description']?.toString() ?? '',
+      location: row['location']?.toString() ?? 'Sin ubicación',
+      pricePerDay: (row['pricePerDay'] as num?)?.toDouble() ?? 0.0,
+      pricePerWeek: (row['pricePerWeek'] as num?)?.toDouble() ?? 0.0,
+      pricePerMonth: (row['pricePerMonth'] as num?)?.toDouble() ?? 0.0,
+      rating: (row['rating'] as num?)?.toDouble() ?? 0.0,
+      reviewCount: (row['reviewCount'] as int?) ?? 0,
+      available: row['available'] == 1,
+      ownerId: row['ownerId']?.toString() ?? '',
+      ownerName: row['ownerName']?.toString() ?? 'Arrendador',
+      images: image.isNotEmpty ? [image] : [],
+      specs: parsedSpecs,
+    );
+  }
+
+  Future<void> _handleFavoriteTap(String equipmentId) async {
+    await widget.onToggleFavorite(equipmentId);
+    await _loadFavorites();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final favoriteEquipment = MockData.equipmentList
-        .where((e) => favoriteIds.contains(e.id))
-        .toList();
-        
-    final isDark = Theme.of(context).brightness == Brightness.dark; // <--- DETECCIÓN DE TEMA
+    if (_isLoading) {
+      return const SafeArea(
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     return SafeArea(
       child: Column(
@@ -33,51 +131,62 @@ class FavoritesScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  tr('Favoritos', 'Favorites'), // TRADUCCIÓN
+                  tr('Favoritos', 'Favorites'),
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  tr('${favoriteEquipment.length} equipos guardados', '${favoriteEquipment.length} saved equipment'), // TRADUCCIÓN
+                  tr(
+                    '${_favoriteEquipment.length} equipos guardados',
+                    '${_favoriteEquipment.length} saved equipment',
+                  ),
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ],
             ),
           ),
           Expanded(
-            child: favoriteEquipment.isEmpty
+            child: _favoriteEquipment.isEmpty
                 ? _buildEmptyState(context)
-                : GridView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.72,
-                    ),
-                    itemCount: favoriteEquipment.length,
-                    itemBuilder: (context, index) {
-                      final equipment = favoriteEquipment[index];
-                      return EquipmentCard(
-                        equipment: equipment,
-                        isFavorite: true,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => EquipmentDetailScreen(
-                                equipment: equipment,
-                                isFavorite: true,
-                                onToggleFavorite: () =>
-                                    onToggleFavorite(equipment.id),
+                : RefreshIndicator(
+                    onRefresh: _loadFavorites,
+                    child: GridView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 16,
+                        crossAxisSpacing: 16,
+                        childAspectRatio: 0.72,
+                      ),
+                      itemCount: _favoriteEquipment.length,
+                      itemBuilder: (context, index) {
+                        final equipment = _favoriteEquipment[index];
+
+                        return EquipmentCard(
+                          equipment: equipment,
+                          isFavorite: widget.favoriteIds.contains(equipment.id),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => EquipmentDetailScreen(
+                                  equipment: equipment,
+                                  isFavorite:
+                                      widget.favoriteIds.contains(equipment.id),
+                                  onToggleFavorite: () {
+                                    _handleFavoriteTap(equipment.id);
+                                  },
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                        onFavoriteTap: () => onToggleFavorite(equipment.id),
-                      );
-                    },
+                            );
+                          },
+                          onFavoriteTap: () {
+                            _handleFavoriteTap(equipment.id);
+                          },
+                        );
+                      },
+                    ),
                   ),
           ),
         ],
@@ -97,14 +206,17 @@ class FavoritesScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            tr('Sin favoritos aún', 'No favorites yet'), // TRADUCCIÓN
+            tr('Sin favoritos aún', 'No favorites yet'),
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-              tr('Guarda tus equipos favoritos para acceder rápidamente', 'Save your favorite equipment to access quickly'), // TRADUCCIÓN
+              tr(
+                'Guarda tus equipos favoritos para acceder rápidamente',
+                'Save your favorite equipment to access quickly',
+              ),
               style: Theme.of(context).textTheme.bodyMedium,
               textAlign: TextAlign.center,
             ),

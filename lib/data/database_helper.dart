@@ -29,7 +29,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -233,13 +233,18 @@ class DatabaseHelper {
     ''');
 
     await _createRentalTrackingTable(db);
+    await _createFavoritesAndSearchTables(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 2) {
-      await _createRentalTrackingTable(db);
-    }
+  if (oldVersion < 2) {
+    await _createRentalTrackingTable(db);
   }
+
+  if (oldVersion < 3) {
+    await _createFavoritesAndSearchTables(db);
+  }
+}
 
   Future<void> _createRentalTrackingTable(Database db) async {
     await db.execute('''
@@ -260,8 +265,27 @@ class DatabaseHelper {
         updatedAt TEXT NOT NULL
       )
     ''');
+    
   }
+Future<void> _createFavoritesAndSearchTables(Database db) async {
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS favorite_equipments (
+      userId TEXT NOT NULL,
+      equipmentId TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      PRIMARY KEY (userId, equipmentId)
+    )
+  ''');
 
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS search_history (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      query TEXT NOT NULL,
+      createdAt TEXT NOT NULL
+    )
+  ''');
+}
   Future<int> insert(String table, Map<String, dynamic> data) async {
     final db = await database;
     return await db.insert(
@@ -682,4 +706,194 @@ class DatabaseHelper {
       whereArgs: [bookingId],
     );
   }
+  Future<List<String>> getFavoriteIdsForUser(String userId) async {
+  final db = await database;
+
+  final rows = await db.query(
+    'favorite_equipments',
+    columns: ['equipmentId'],
+    where: 'userId = ?',
+    whereArgs: [userId],
+    orderBy: 'createdAt DESC',
+  );
+
+  return rows.map((row) => row['equipmentId'].toString()).toList();
+}
+
+Future<bool> isEquipmentFavorite({
+  required String userId,
+  required String equipmentId,
+}) async {
+  final db = await database;
+
+  final rows = await db.query(
+    'favorite_equipments',
+    where: 'userId = ? AND equipmentId = ?',
+    whereArgs: [userId, equipmentId],
+    limit: 1,
+  );
+
+  return rows.isNotEmpty;
+}
+
+Future<Set<String>> toggleFavoriteEquipment({
+  required String userId,
+  required String equipmentId,
+}) async {
+  final db = await database;
+
+  final exists = await isEquipmentFavorite(
+    userId: userId,
+    equipmentId: equipmentId,
+  );
+
+  if (exists) {
+    await db.delete(
+      'favorite_equipments',
+      where: 'userId = ? AND equipmentId = ?',
+      whereArgs: [userId, equipmentId],
+    );
+  } else {
+    await db.insert(
+      'favorite_equipments',
+      {
+        'userId': userId,
+        'equipmentId': equipmentId,
+        'createdAt': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  final ids = await getFavoriteIdsForUser(userId);
+  return ids.toSet();
+}
+
+Future<List<Map<String, dynamic>>> getFavoriteEquipmentsForUser(
+  String userId,
+) async {
+  final db = await database;
+
+  final rows = await db.rawQuery(
+    '''
+    SELECT e.*
+    FROM favorite_equipments f
+    INNER JOIN equipments e ON e.id = f.equipmentId
+    WHERE f.userId = ?
+    ORDER BY f.createdAt DESC
+    ''',
+    [userId],
+  );
+
+  return rows;
+}
+
+Future<List<Map<String, dynamic>>> getAvailableEquipments() async {
+  final db = await database;
+
+  return await db.query(
+    'equipments',
+    where: 'available = ?',
+    whereArgs: [1],
+    orderBy: 'name ASC',
+  );
+}
+
+Future<void> addSearchTerm({
+  required String userId,
+  required String query,
+}) async {
+  final db = await database;
+
+  final cleanQuery = query.trim();
+
+  if (cleanQuery.isEmpty) return;
+
+  // Optimización local: si el usuario repite la misma búsqueda, se elimina
+  // la anterior y se inserta de nuevo para subirla al inicio del historial.
+  await db.delete(
+    'search_history',
+    where: 'userId = ? AND LOWER(query) = LOWER(?)',
+    whereArgs: [userId, cleanQuery],
+  );
+
+  await db.insert(
+    'search_history',
+    {
+      'id': '${userId}_${DateTime.now().millisecondsSinceEpoch}',
+      'userId': userId,
+      'query': cleanQuery,
+      'createdAt': DateTime.now().toIso8601String(),
+    },
+    conflictAlgorithm: ConflictAlgorithm.replace,
+  );
+
+  final rows = await db.query(
+    'search_history',
+    columns: ['id'],
+    where: 'userId = ?',
+    whereArgs: [userId],
+    orderBy: 'createdAt DESC',
+    limit: 100,
+  );
+
+  if (rows.length > 10) {
+    final keepIds = rows.take(10).map((row) => row['id']).toList();
+
+    final placeholders = List.filled(keepIds.length, '?').join(',');
+
+    await db.delete(
+      'search_history',
+      where: 'userId = ? AND id NOT IN ($placeholders)',
+      whereArgs: [userId, ...keepIds],
+    );
+  }
+}
+
+Future<List<String>> getRecentSearches(String userId) async {
+  final db = await database;
+
+  final rows = await db.query(
+    'search_history',
+    columns: ['query'],
+    where: 'userId = ?',
+    whereArgs: [userId],
+    orderBy: 'createdAt DESC',
+    limit: 10,
+  );
+
+  return rows.map((row) => row['query'].toString()).toList();
+}
+
+Future<void> clearSearchHistory(String userId) async {
+  final db = await database;
+
+  await db.delete(
+    'search_history',
+    where: 'userId = ?',
+    whereArgs: [userId],
+  );
+}
+
+Future<Map<String, int>> getEquipmentCategoryCounts() async {
+  final db = await database;
+
+  final rows = await db.rawQuery(
+    '''
+    SELECT category, COUNT(*) as total
+    FROM equipments
+    WHERE available = 1
+    GROUP BY category
+    ORDER BY total DESC
+    ''',
+  );
+
+  final result = <String, int>{};
+
+  for (final row in rows) {
+    result[row['category'].toString()] = (row['total'] as int?) ?? 0;
+  }
+
+  return result;
+}
 }

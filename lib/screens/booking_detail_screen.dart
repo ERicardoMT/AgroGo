@@ -1,14 +1,20 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
+import '../data/database_helper.dart';
+import '../globals.dart';
 import '../models/booking.dart';
 import '../theme/app_theme.dart';
-import '../globals.dart';
-import '../data/database_helper.dart';
 
 class BookingDetailScreen extends StatefulWidget {
   final Booking booking;
 
-  const BookingDetailScreen({super.key, required this.booking});
+  const BookingDetailScreen({
+    super.key,
+    required this.booking,
+  });
 
   @override
   State<BookingDetailScreen> createState() => _BookingDetailScreenState();
@@ -18,7 +24,22 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   final DatabaseHelper _db = DatabaseHelper();
 
   Map<String, dynamic>? _tracking;
+
   bool _loading = true;
+  bool _autoRunning = false;
+  bool _autoPaused = false;
+
+  Timer? _autoTimer;
+  DateTime? _autoStartedAt;
+  DateTime? _lastDbWrite;
+
+  double _liveProgress = 0.0;
+  int _liveStep = 0;
+  int _lastPersistedStep = -1;
+
+  static const Duration _simulationDuration = Duration(minutes: 3);
+  static const Duration _frameDuration = Duration(milliseconds: 70);
+  static const Duration _dbThrottle = Duration(milliseconds: 600);
 
   final List<String> _stepsEs = const [
     'Pedido confirmado',
@@ -42,6 +63,12 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     _prepareTracking();
   }
 
+  @override
+  void dispose() {
+    _autoTimer?.cancel();
+    super.dispose();
+  }
+
   Future<void> _prepareTracking() async {
     await _db.createTrackingIfMissing(
       bookingId: widget.booking.id,
@@ -53,8 +80,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
     if (!mounted) return;
 
+    final progress = ((data?['progress'] as num?) ?? 0).toDouble();
+    final step = (data?['currentStep'] as int?) ?? _stepFromProgress(progress);
+
     setState(() {
       _tracking = data;
+      _liveProgress = progress.clamp(0.0, 1.0);
+      _liveStep = step.clamp(0, 4);
       _loading = false;
     });
   }
@@ -64,24 +96,215 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
     if (!mounted) return;
 
+    final progress = ((data?['progress'] as num?) ?? _liveProgress).toDouble();
+    final step = (data?['currentStep'] as int?) ?? _stepFromProgress(progress);
+
     setState(() {
       _tracking = data;
+      _liveProgress = progress.clamp(0.0, 1.0);
+      _liveStep = step.clamp(0, 4);
     });
   }
 
-  Future<void> _startMovement() async {
+  int _stepFromProgress(double progress) {
+    if (progress >= 1.0) return 4;
+    if (progress >= 0.86) return 3;
+    if (progress >= 0.58) return 2;
+    if (progress >= 0.16) return 1;
+    return 0;
+  }
+
+  int _etaFromProgress(double progress) {
+    final remaining = (1.0 - progress).clamp(0.0, 1.0);
+    return (remaining * 45).ceil();
+  }
+
+  double _latFromProgress(double progress) {
+    const startLat = 19.3900;
+    const endLat = 19.4150;
+    return startLat + ((endLat - startLat) * progress);
+  }
+
+  double _lngFromProgress(double progress) {
+    const startLng = -99.1200;
+    const endLng = -99.1500;
+    return startLng + ((endLng - startLng) * progress);
+  }
+
+  Future<void> _persistTrackingFrame(
+    double progress, {
+    bool force = false,
+    bool paused = false,
+  }) async {
+    final now = DateTime.now();
+    final step = _stepFromProgress(progress);
+
+    final shouldWriteByTime =
+        _lastDbWrite == null || now.difference(_lastDbWrite!) >= _dbThrottle;
+
+    final shouldWriteByStep = step != _lastPersistedStep;
+
+    if (!force && !shouldWriteByTime && !shouldWriteByStep) return;
+
+    _lastDbWrite = now;
+    _lastPersistedStep = step;
+
+    final trackingId = 'tracking_${widget.booking.id}';
+
+    await _db.update(
+      'rental_tracking',
+      {
+        'currentStep': step,
+        'progress': progress.clamp(0.0, 1.0),
+        'etaMinutes': _etaFromProgress(progress),
+        'isMoving': paused || progress >= 1.0 ? 0 : 1,
+        'currentLatitude': _latFromProgress(progress),
+        'currentLongitude': _lngFromProgress(progress),
+        'updatedAt': now.toIso8601String(),
+      },
+      trackingId,
+    );
+
+    if (progress >= 1.0) {
+      await _db.update(
+        'bookings',
+        {'status': 'completed'},
+        widget.booking.id,
+      );
+    } else if (progress > 0.0) {
+      await _db.update(
+        'bookings',
+        {'status': 'active'},
+        widget.booking.id,
+      );
+    }
+  }
+
+  Future<void> _startAutomaticSimulation() async {
+    if (_autoRunning) return;
+
+    if (_liveProgress >= 1.0) {
+      await _resetAutomaticSimulation();
+    }
+
     await _db.startTrackingMovement(widget.booking.id);
     await _reloadTracking();
+
+    _resumeFromCurrentProgress();
   }
 
-  Future<void> _advanceStep() async {
-    await _db.advanceTrackingStep(widget.booking.id);
-    await _reloadTracking();
+  void _resumeFromCurrentProgress() {
+    final safeProgress = _liveProgress.clamp(0.0, 0.99);
+    final elapsedOffset =
+        (_simulationDuration.inMilliseconds * safeProgress).round();
+
+    _autoStartedAt = DateTime.now().subtract(
+      Duration(milliseconds: elapsedOffset),
+    );
+
+    _autoTimer?.cancel();
+
+    setState(() {
+      _autoRunning = true;
+      _autoPaused = false;
+    });
+
+    _autoTimer = Timer.periodic(_frameDuration, (_) {
+      _tickAutomaticSimulation();
+    });
   }
 
-  Future<void> _resetSimulation() async {
+  Future<void> _pauseAutomaticSimulation() async {
+    if (!_autoRunning) return;
+
+    _autoTimer?.cancel();
+
+    await _persistTrackingFrame(
+      _liveProgress,
+      force: true,
+      paused: true,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _autoRunning = false;
+      _autoPaused = true;
+    });
+  }
+
+  Future<void> _continueAutomaticSimulation() async {
+    if (_autoRunning) return;
+    if (!_autoPaused) return;
+    if (_liveProgress >= 1.0) return;
+
+    await _persistTrackingFrame(
+      _liveProgress,
+      force: true,
+      paused: false,
+    );
+
+    _resumeFromCurrentProgress();
+  }
+
+  Future<void> _tickAutomaticSimulation() async {
+    final startedAt = _autoStartedAt;
+    if (startedAt == null) return;
+
+    final elapsed = DateTime.now().difference(startedAt);
+
+    final rawProgress =
+        elapsed.inMilliseconds / _simulationDuration.inMilliseconds;
+
+    final clampedRaw = rawProgress.clamp(0.0, 1.0);
+    final easedProgress = Curves.easeInOutCubic.transform(clampedRaw);
+
+    final step = _stepFromProgress(easedProgress);
+
+    if (mounted) {
+      setState(() {
+        _liveProgress = easedProgress;
+        _liveStep = step;
+      });
+    }
+
+    await _persistTrackingFrame(easedProgress);
+
+    if (clampedRaw >= 1.0) {
+      _autoTimer?.cancel();
+
+      await _persistTrackingFrame(1.0, force: true);
+
+      if (!mounted) return;
+
+      setState(() {
+        _autoRunning = false;
+        _autoPaused = false;
+        _liveProgress = 1.0;
+        _liveStep = 4;
+      });
+
+      await _reloadTracking();
+    }
+  }
+
+  Future<void> _resetAutomaticSimulation() async {
+    _autoTimer?.cancel();
+
     await _db.resetTrackingSimulation(widget.booking.id);
     await _reloadTracking();
+
+    if (!mounted) return;
+
+    setState(() {
+      _autoRunning = false;
+      _autoPaused = false;
+      _autoStartedAt = null;
+      _lastDbWrite = null;
+      _lastPersistedStep = -1;
+      _liveProgress = 0.0;
+      _liveStep = 0;
+    });
   }
 
   @override
@@ -98,11 +321,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
       );
     }
 
-    final tracking = _tracking;
-    final currentStep = (tracking?['currentStep'] as int?) ?? 0;
-    final progress = ((tracking?['progress'] as num?) ?? 0).toDouble();
-    final etaMinutes = (tracking?['etaMinutes'] as int?) ?? 45;
-    final isMoving = ((tracking?['isMoving'] as int?) ?? 0) == 1;
+    final etaMinutes = _etaFromProgress(_liveProgress);
+
+    final isMoving = _autoRunning || (_liveProgress > 0 && _liveProgress < 1);
 
     return Scaffold(
       appBar: AppBar(
@@ -116,11 +337,13 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _statusHeader(currentStep, etaMinutes, isMoving),
+              _statusHeader(_liveStep, etaMinutes, isMoving),
               const SizedBox(height: 20),
-              _tractorMapCard(isDark, progress, currentStep),
+              _tractorMapCard(isDark, _liveProgress, _liveStep),
               const SizedBox(height: 20),
-              _trackingTimeline(currentStep),
+              _autoSimulationPanel(isDark),
+              const SizedBox(height: 20),
+              _trackingTimeline(_liveStep),
               const SizedBox(height: 20),
               _operatorCard(isDark),
               const SizedBox(height: 20),
@@ -130,7 +353,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
               const SizedBox(height: 20),
               _paymentCard(isDark),
               const SizedBox(height: 24),
-              _simulationButtons(currentStep),
+              _mainActionButton(),
             ],
           ),
         ),
@@ -140,6 +363,25 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
 
   Widget _statusHeader(int currentStep, int etaMinutes, bool isMoving) {
     final title = tr(_stepsEs[currentStep], _stepsEn[currentStep]);
+
+    String subtitle;
+
+    if (_autoPaused) {
+      subtitle = tr(
+        'Seguimiento pausado',
+        'Tracking paused',
+      );
+    } else if (etaMinutes > 0) {
+      subtitle = tr(
+        'Llegada estimada: $etaMinutes min',
+        'Estimated arrival: $etaMinutes min',
+      );
+    } else {
+      subtitle = tr(
+        'Recorrido completado',
+        'Route completed',
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -155,11 +397,15 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
+              color: Colors.white.withOpacity(0.16),
               borderRadius: BorderRadius.circular(18),
             ),
             child: Icon(
-              isMoving ? Icons.local_shipping : Icons.agriculture,
+              _autoPaused
+                  ? Icons.pause_circle
+                  : isMoving
+                      ? Icons.local_shipping
+                      : Icons.agriculture,
               color: Colors.white,
               size: 30,
             ),
@@ -179,14 +425,9 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  etaMinutes > 0
-                      ? tr(
-                          'Llegada estimada: $etaMinutes min',
-                          'Estimated arrival: $etaMinutes min',
-                        )
-                      : tr('Sin tiempo pendiente', 'No remaining time'),
+                  subtitle,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.86),
+                    color: Colors.white.withOpacity(0.86),
                     fontSize: 13,
                   ),
                 ),
@@ -199,91 +440,212 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
   }
 
   Widget _tractorMapCard(bool isDark, double progress, int currentStep) {
-    final leftPosition = 18 + (220 * progress.clamp(0.0, 1.0));
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final mapWidth = constraints.maxWidth;
+        final safeProgress = progress.clamp(0.0, 1.0);
+
+        final tractorLeft = (mapWidth - 72) * safeProgress;
+        final tractorBottom = 55 + (70 * safeProgress);
+
+        return Container(
+          height: 230,
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark ? const Color(0xFF303030) : AppTheme.borderColor,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: CustomPaint(
+                  painter: _RoutePainter(
+                    isDark: isDark,
+                    progress: safeProgress,
+                  ),
+                ),
+              ),
+              const Positioned(
+                left: 8,
+                bottom: 22,
+                child: _MapPin(
+                  icon: Icons.store_mall_directory,
+                  label: 'Origen',
+                ),
+              ),
+              const Positioned(
+                right: 8,
+                top: 18,
+                child: _MapPin(
+                  icon: Icons.location_on,
+                  label: 'Destino',
+                ),
+              ),
+              AnimatedPositioned(
+                duration: _autoPaused
+                    ? Duration.zero
+                    : const Duration(milliseconds: 120),
+                curve: Curves.linear,
+                left: tractorLeft.clamp(10.0, mapWidth - 68),
+                bottom: tractorBottom.clamp(50.0, 150.0),
+                child: AnimatedContainer(
+                  duration: _autoPaused
+                      ? Duration.zero
+                      : const Duration(milliseconds: 120),
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: _autoPaused
+                        ? AppTheme.warningColor
+                        : AppTheme.primaryColor,
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (_autoPaused
+                                ? AppTheme.warningColor
+                                : AppTheme.primaryColor)
+                            .withOpacity(0.35),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      _autoPaused ? '⏸️' : '🚜',
+                      style: const TextStyle(fontSize: 30),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                top: 0,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: currentStep >= 4
+                        ? AppTheme.successColor.withOpacity(0.12)
+                        : _autoPaused
+                            ? AppTheme.warningColor.withOpacity(0.12)
+                            : AppTheme.primaryColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: Text(
+                    currentStep >= 4
+                        ? tr('Ruta completada', 'Route completed')
+                        : _autoPaused
+                            ? tr('Ruta pausada', 'Route paused')
+                            : tr(
+                                'Ruta automática en vivo',
+                                'Live automatic route',
+                              ),
+                    style: TextStyle(
+                      color: _autoPaused
+                          ? AppTheme.warningColor
+                          : AppTheme.primaryColor,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _autoSimulationPanel(bool isDark) {
+    final percentage = (_liveProgress * 100).clamp(0, 100).toStringAsFixed(0);
+
+    String message;
+
+    if (_autoRunning) {
+      message = tr(
+        'El tractor está avanzando automáticamente...',
+        'The tractor is moving automatically...',
+      );
+    } else if (_autoPaused) {
+      message = tr(
+        'El recorrido está pausado. Puedes continuarlo desde este punto.',
+        'The route is paused. You can continue from this point.',
+      );
+    } else {
+      message = tr(
+        'Presiona iniciar para recorrer toda la ruta.',
+        'Press start to complete the full route.',
+      );
+    }
 
     return Container(
-      height: 210,
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isDark ? const Color(0xFF303030) : AppTheme.borderColor,
         ),
       ),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _RoutePainter(
-                isDark: isDark,
-                progress: progress,
-              ),
+          Text(
+            tr('Simulación automática', 'Automatic simulation'),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
             ),
           ),
-          const Positioned(
-            left: 8,
-            bottom: 22,
-            child: _MapPin(
-              icon: Icons.store_mall_directory,
-              label: 'Origen',
+          const SizedBox(height: 10),
+          LinearProgressIndicator(
+            value: _liveProgress.clamp(0.0, 1.0),
+            minHeight: 9,
+            borderRadius: BorderRadius.circular(20),
+            backgroundColor: isDark ? Colors.grey[800] : Colors.grey[300],
+            valueColor: AlwaysStoppedAnimation<Color>(
+              _autoPaused ? AppTheme.warningColor : AppTheme.primaryColor,
             ),
           ),
-          const Positioned(
-            right: 8,
-            top: 18,
-            child: _MapPin(
-              icon: Icons.location_on,
-              label: 'Destino',
-            ),
-          ),
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 650),
-            curve: Curves.easeOutCubic,
-            left: leftPosition.clamp(18.0, 238.0),
-            bottom: 68 + (58 * progress),
-            child: Container(
-              width: 54,
-              height: 54,
-              decoration: BoxDecoration(
-                color: AppTheme.primaryColor,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primaryColor.withValues(alpha: 0.35),
-                    blurRadius: 18,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Icon(
+                _autoRunning
+                    ? Icons.play_circle_fill
+                    : _autoPaused
+                        ? Icons.pause_circle_filled
+                        : Icons.route,
+                color: _autoPaused
+                    ? AppTheme.warningColor
+                    : AppTheme.primaryColor,
+                size: 20,
               ),
-              child: const Center(
-                child: Text('🚜', style: TextStyle(fontSize: 28)),
-              ),
-            ),
-          ),
-          Positioned(
-            left: 0,
-            top: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: currentStep >= 4
-                    ? AppTheme.successColor.withValues(alpha: 0.12)
-                    : AppTheme.primaryColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(100),
-              ),
-              child: Text(
-                currentStep >= 4
-                    ? tr('Ruta completada', 'Route completed')
-                    : tr('Ruta simulada en vivo', 'Live simulated route'),
-                style: const TextStyle(
-                  color: AppTheme.primaryColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  message,
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
-            ),
+              Text(
+                '$percentage%',
+                style: TextStyle(
+                  color: _autoPaused
+                      ? AppTheme.warningColor
+                      : AppTheme.primaryColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -411,7 +773,7 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withValues(alpha: 0.1),
+              color: AppTheme.primaryColor.withOpacity(0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Center(
@@ -485,51 +847,86 @@ class _BookingDetailScreenState extends State<BookingDetailScreen> {
     );
   }
 
-  Widget _simulationButtons(int currentStep) {
-    return Column(
-      children: [
-        if (currentStep == 0)
+  Widget _mainActionButton() {
+    if (_autoRunning) {
+      return Column(
+        children: [
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _startMovement,
-              icon: const Icon(Icons.play_arrow),
+              onPressed: _pauseAutomaticSimulation,
+              icon: const Icon(Icons.pause_rounded),
               label: Text(
-                tr(
-                  'Iniciar movimiento del tractor',
-                  'Start tractor movement',
-                ),
+                tr('Pausar recorrido', 'Pause route'),
               ),
             ),
-          )
-        else if (currentStep < 4)
+          ),
+        ],
+      );
+    }
+
+    if (_autoPaused) {
+      return Column(
+        children: [
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _advanceStep,
-              icon: const Icon(Icons.navigation),
+              onPressed: _continueAutomaticSimulation,
+              icon: const Icon(Icons.play_arrow_rounded),
               label: Text(
-                tr('Avanzar simulación', 'Advance simulation'),
+                tr('Continuar recorrido', 'Continue route'),
               ),
             ),
-          )
-        else
+          ),
+          const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _resetSimulation,
+            child: OutlinedButton.icon(
+              onPressed: _resetAutomaticSimulation,
               icon: const Icon(Icons.restart_alt),
               label: Text(
                 tr('Reiniciar simulación', 'Restart simulation'),
               ),
             ),
           ),
+        ],
+      );
+    }
+
+    if (_liveProgress >= 1.0) {
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: _resetAutomaticSimulation,
+          icon: const Icon(Icons.restart_alt),
+          label: Text(
+            tr('Reiniciar simulación', 'Restart simulation'),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: _startAutomaticSimulation,
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: Text(
+              tr(
+                'Iniciar recorrido automático',
+                'Start automatic route',
+              ),
+            ),
+          ),
+        ),
         const SizedBox(height: 10),
-        if (currentStep > 0 && currentStep < 4)
+        if (_liveProgress > 0)
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              onPressed: _resetSimulation,
+              onPressed: _resetAutomaticSimulation,
               icon: const Icon(Icons.restore),
               label: Text(
                 tr('Reiniciar seguimiento', 'Reset tracking'),
@@ -617,7 +1014,8 @@ class _RoutePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Optimización de mirilla: un solo Path dibuja ruta base y ruta activa.
+    // Optimización de mirilla: se reutiliza un solo Path para pintar la ruta base
+    // y después extraer únicamente la parte activa del recorrido.
     final basePaint = Paint()
       ..color = isDark ? const Color(0xFF3A3A3A) : const Color(0xFFE0E0E0)
       ..strokeWidth = 6
@@ -633,23 +1031,27 @@ class _RoutePainter extends CustomPainter {
     final path = Path()
       ..moveTo(35, size.height - 45)
       ..cubicTo(
-        size.width * 0.28,
-        size.height * 0.75,
-        size.width * 0.48,
-        size.height * 0.38,
+        size.width * 0.25,
+        size.height * 0.82,
+        size.width * 0.55,
+        size.height * 0.28,
         size.width - 45,
         45,
       );
 
     canvas.drawPath(path, basePaint);
 
-    final metric = path.computeMetrics().first;
-    final extractPath = metric.extractPath(
+    final metrics = path.computeMetrics().toList();
+    if (metrics.isEmpty) return;
+
+    final metric = metrics.first;
+
+    final activePath = metric.extractPath(
       0,
       metric.length * progress.clamp(0.0, 1.0),
     );
 
-    canvas.drawPath(extractPath, activePaint);
+    canvas.drawPath(activePath, activePaint);
   }
 
   @override

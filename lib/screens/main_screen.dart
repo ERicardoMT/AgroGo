@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
-import 'search_screen.dart';
+
+import '../data/database_helper.dart';
+import '../globals.dart';
 import 'bookings_screen.dart';
 import 'favorites_screen.dart';
+import 'home_screen.dart';
 import 'profile_screen.dart';
-import '../globals.dart'; // <--- IMPORT GLOBAL
+import 'search_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -14,30 +16,80 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
+  final DatabaseHelper _db = DatabaseHelper();
+
   int _currentIndex = 0;
   final Set<String> _favoriteIds = {};
+  bool _loadingFavorites = true;
 
-  void _toggleFavorite(String id) {
+  @override
+  void initState() {
+    super.initState();
+    _loadFavoriteIds();
+  }
+
+  Future<void> _loadFavoriteIds() async {
+    final currentUser = currentUserEmailNotifier.value;
+
+    if (currentUser == null) {
+      if (!mounted) return;
+      setState(() => _loadingFavorites = false);
+      return;
+    }
+
+    final ids = await _db.getFavoriteIdsForUser(currentUser);
+
+    if (!mounted) return;
+
     setState(() {
-      if (_favoriteIds.contains(id)) {
-        _favoriteIds.remove(id);
-      } else {
-        _favoriteIds.add(id);
-      }
+      _favoriteIds
+        ..clear()
+        ..addAll(ids);
+      _loadingFavorites = false;
+    });
+  }
+
+  Future<void> _toggleFavorite(String id) async {
+    final currentUser = currentUserEmailNotifier.value;
+
+    if (currentUser == null) return;
+
+    final updatedFavorites = await _db.toggleFavoriteEquipment(
+      userId: currentUser,
+      equipmentId: id,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _favoriteIds
+        ..clear()
+        ..addAll(updatedFavorites);
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark; // DETECCIÓN DE TEMA
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_loadingFavorites) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     final screens = [
       HomeScreen(
         favoriteIds: _favoriteIds,
         onToggleFavorite: _toggleFavorite,
-        onSearchTap: () => setState(() => _currentIndex = 1), // NAVEGACIÓN DESDE HOME
+        onSearchTap: () => setState(() => _currentIndex = 1),
       ),
-      const SearchScreen(),
+      SearchScreen(
+        favoriteIds: _favoriteIds,
+        onToggleFavorite: _toggleFavorite,
+      ),
       const BookingsScreen(),
       FavoritesScreen(
         favoriteIds: _favoriteIds,
@@ -55,7 +107,9 @@ class _MainScreenState extends State<MainScreen> {
         decoration: BoxDecoration(
           boxShadow: [
             BoxShadow(
-              color: isDark ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.05), // ADAPTACIÓN
+              color: isDark
+                  ? Colors.black.withOpacity(0.3)
+                  : Colors.black.withOpacity(0.05),
               blurRadius: 10,
               offset: const Offset(0, -5),
             ),
@@ -68,27 +122,27 @@ class _MainScreenState extends State<MainScreen> {
             BottomNavigationBarItem(
               icon: const Icon(Icons.home_outlined),
               activeIcon: const Icon(Icons.home),
-              label: tr('Inicio', 'Home'), // TRADUCCIÓN
+              label: tr('Inicio', 'Home'),
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.search_outlined),
               activeIcon: const Icon(Icons.search),
-              label: tr('Buscar', 'Search'), // TRADUCCIÓN
+              label: tr('Buscar', 'Search'),
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.calendar_today_outlined),
               activeIcon: const Icon(Icons.calendar_today),
-              label: tr('Reservas', 'Bookings'), // TRADUCCIÓN
+              label: tr('Reservas', 'Bookings'),
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.favorite_outline),
               activeIcon: const Icon(Icons.favorite),
-              label: tr('Favoritos', 'Favorites'), // TRADUCCIÓN
+              label: tr('Favoritos', 'Favorites'),
             ),
             BottomNavigationBarItem(
               icon: const Icon(Icons.person_outline),
               activeIcon: const Icon(Icons.person),
-              label: tr('Perfil', 'Profile'), // TRADUCCIÓN
+              label: tr('Perfil', 'Profile'),
             ),
           ],
         ),
