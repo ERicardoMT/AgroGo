@@ -28,7 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Variables reales de la Base de Datos
   String? _profilePicturePath; 
   int _totalReservas = 0; 
-  double _userRating = 0.0; // <--- Calificación real agregada
+  double _userRating = 0.0;
 
   final List<String> _ilustraciones = [
     'https://api.dicebear.com/7.x/adventurer/png?seed=Felix',
@@ -45,15 +45,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadUserData();
   }
 
-  // --- 1. CARGAR DATOS DESDE SQLITE ---
   Future<void> _loadUserData() async {
     final dbHelper = DatabaseHelper();
     final users = await dbHelper.getAll('users');
     final currentEmail = currentUserEmailNotifier.value; 
 
-    // Obtener cantidad de reservas y calificación reales
     final reservas = await dbHelper.getUserBookingsCount();
-    final calificacion = await dbHelper.getUserAverageRating(); // <--- Consulta a la BD
+    final calificacion = await dbHelper.getUserAverageRating(); 
 
     if (users.isNotEmpty && currentEmail != null) {
       try {
@@ -65,7 +63,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _userEmail = currentEmail;
             _profilePicturePath = miUsuario['profile_picture']?.toString(); 
             _totalReservas = reservas; 
-            _userRating = calificacion; // <--- Asignamos la calificación
+            _userRating = calificacion; 
             _userInitials = _userName.split(' ').map((n) => n.isNotEmpty ? n[0] : '').take(2).join().toUpperCase();
           });
         }
@@ -76,14 +74,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _userEmail = currentEmail ?? '';
             _userInitials = 'US';
             _totalReservas = reservas;
-            _userRating = calificacion; // <--- Asignamos la calificación en caso de error de usuario
+            _userRating = calificacion; 
           });
         }
       }
     }
   }
 
-  // --- 2. GUARDAR FOTO LOCAL (CÁMARA/GALERÍA) ---
   Future<void> _pickImage(ImageSource source) async {
     Navigator.pop(context); 
     try {
@@ -91,7 +88,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (pickedFile != null) {
         final currentEmail = currentUserEmailNotifier.value;
         if (currentEmail != null) {
-          // Guardar en la base de datos
           await DatabaseHelper().updateProfilePicture(currentEmail, pickedFile.path);
           setState(() {
             _profilePicturePath = pickedFile.path;
@@ -103,11 +99,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // --- 3. GUARDAR ILUSTRACIÓN (URL) ---
   Future<void> _seleccionarIlustracion(String url) async {
     final currentEmail = currentUserEmailNotifier.value;
     if (currentEmail != null) {
-      // Guardar en la base de datos
       await DatabaseHelper().updateProfilePicture(currentEmail, url);
       setState(() {
         _profilePicturePath = url;
@@ -200,10 +194,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // --- MÉTODOS DE PAGO INTERACTIVOS ---
   void _mostrarMetodosPago(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    int metodoSeleccionado = 0; // 0 = MercadoPago, 1 = PayPal
+    int metodoSeleccionado = 0; 
 
     showModalBottomSheet(
       context: context,
@@ -220,7 +213,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Text(tr("Métodos de Pago", "Payment Methods"), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 20),
                   
-                  // Tarjeta Mercado Pago
                   ListTile(
                     leading: const Icon(Icons.credit_card, color: Colors.blue, size: 36),
                     title: const Text("Mercado Pago"),
@@ -236,7 +228,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 10),
 
-                  // Tarjeta PayPal
                   ListTile(
                     leading: const Icon(Icons.paypal, color: Colors.indigo, size: 36),
                     title: const Text("PayPal"),
@@ -252,12 +243,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Botón Agregar Nuevo
                   OutlinedButton.icon(
                     onPressed: () {
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Redirigiendo a pasarela de pago segura..."), backgroundColor: Colors.blue),
+                        SnackBar(content: Text(tr("Redirigiendo a pasarela de pago segura...", "Redirecting to secure payment gateway...")), backgroundColor: Colors.blue),
                       );
                     },
                     icon: const Icon(Icons.add),
@@ -273,10 +263,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // --- DIRECCIONES INTERACTIVAS ---
   void _mostrarDirecciones(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
@@ -301,7 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: () {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Abriendo mapa para seleccionar dirección..."), backgroundColor: Colors.blue),
+                    SnackBar(content: Text(tr("Abriendo mapa para seleccionar dirección...", "Opening map to select address...")), backgroundColor: Colors.blue),
                   );
                 },
                 icon: const Icon(Icons.add_location_alt),
@@ -315,7 +303,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Lógica para decidir qué imagen mostrar
   ImageProvider? _obtenerImagenAvatar() {
     if (_profilePicturePath != null) {
       if (_profilePicturePath!.startsWith('http')) {
@@ -330,148 +317,159 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // --- MAGIA AQUÍ: Envuelve todo en el escuchador de idioma ---
+    return ValueListenableBuilder<String>(
+      valueListenable: languageNotifier,
+      builder: (context, idiomaActual, child) {
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.grey[900] : Colors.white, 
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
+                  ),
+                  child: Column(
+                    children: [
+                      GestureDetector(
+                        onTap: () => _mostrarOpcionesDeFoto(context),
+                        child: Stack(
+                          alignment: Alignment.bottomRight,
+                          children: [
+                            CircleAvatar(
+                              radius: 45,
+                              backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                              backgroundImage: _obtenerImagenAvatar(), 
+                              child: _profilePicturePath == null
+                                  ? Text(_userInitials, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.primaryColor))
+                                  : null,
+                            ),
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                              child: const Icon(Icons.camera_alt, size: 20, color: AppTheme.primaryColor),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(_userName, style: Theme.of(context).textTheme.headlineSmall),
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.location_on_outlined, size: 16, color: AppTheme.textMuted),
+                          const SizedBox(width: 4),
+                          Text(_userLocation, style: Theme.of(context).textTheme.bodyMedium),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
 
-    return SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[900] : Colors.white, 
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: isDark ? Colors.grey[800]! : Colors.grey[300]!),
-              ),
-              child: Column(
-                children: [
-                  GestureDetector(
-                    onTap: () => _mostrarOpcionesDeFoto(context),
-                    child: Stack(
-                      alignment: Alignment.bottomRight,
-                      children: [
-                        CircleAvatar(
-                          radius: 45,
-                          backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
-                          backgroundImage: _obtenerImagenAvatar(), 
-                          child: _profilePicturePath == null
-                              ? Text(_userInitials, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppTheme.primaryColor))
-                              : null,
-                        ),
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                          child: const Icon(Icons.camera_alt, size: 20, color: AppTheme.primaryColor),
-                        ),
-                      ],
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildStat(context, '$_totalReservas', tr('Reservas', 'Bookings')),
+                          Container(width: 1, height: 40, color: AppTheme.borderColor),
+                          _buildStat(context, '$_totalReservas', tr('Equipos rentados', 'Rented equip.')),
+                          Container(width: 1, height: 40, color: AppTheme.borderColor),
+                          _buildStat(context, _userRating.toStringAsFixed(1), tr('Calificación', 'Rating')),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                _buildMenuSection(context, tr('Cuenta', 'Account'), [
+                  _MenuItem(
+                    icon: Icons.person_outline,
+                    title: tr('Información personal', 'Personal Information'),
+                    onTap: () async {
+                      final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const PersonalInfoScreen()));
+                      if (result == true) _loadUserData();
+                    },
+                  ),
+                  _MenuItem(
+                    icon: Icons.credit_card_outlined,
+                    title: tr('Métodos de pago', 'Payment Methods'),
+                    onTap: () => _mostrarMetodosPago(context),
+                  ),
+                  _MenuItem(
+                    icon: Icons.location_on_outlined,
+                    title: tr('Direcciones', 'Addresses'),
+                    onTap: () => _mostrarDirecciones(context),
+                  ),
+                ]),
+                const SizedBox(height: 16),
+                _buildMenuSection(context, tr('Preferencias', 'Preferences'), [
+                  _MenuItem(
+                    icon: Icons.notifications_outlined,
+                    title: tr('Notificaciones', 'Notifications'),
+                    trailing: ValueListenableBuilder<bool>(
+                      valueListenable: notificationsNotifier,
+                      builder: (context, isEnabled, child) {
+                        return Switch(
+                          value: isEnabled,
+                          onChanged: (value) => notificationsNotifier.value = value,
+                          activeColor: AppTheme.primaryColor,
+                        );
+                      },
                     ),
+                    onTap: () => notificationsNotifier.value = !notificationsNotifier.value,
                   ),
-                  const SizedBox(height: 16),
-                  Text(_userName, style: Theme.of(context).textTheme.headlineSmall),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.location_on_outlined, size: 16, color: AppTheme.textMuted),
-                      const SizedBox(width: 4),
-                      Text(_userLocation, style: Theme.of(context).textTheme.bodyMedium),
-                    ],
+                  _MenuItem(
+                    icon: Icons.language_outlined, 
+                    title: tr('Idioma', 'Language'), 
+                    subtitle: idiomaActual == 'Inglés' ? tr('Inglés', 'English') : tr('Español', 'Spanish'),
+                    onTap: () => _mostrarOpcionesIdioma(context)
                   ),
-                  const SizedBox(height: 20),
-
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildStat(context, '$_totalReservas', tr('Reservas', 'Bookings')),
-                      Container(width: 1, height: 40, color: AppTheme.borderColor),
-                      _buildStat(context, '$_totalReservas', tr('Equipos rentados', 'Rented equip.')),
-                      Container(width: 1, height: 40, color: AppTheme.borderColor),
-                      _buildStat(context, _userRating.toStringAsFixed(1), tr('Calificación', 'Rating')), // <--- CALIFICACIÓN DINÁMICA
-                    ],
+                  _MenuItem(
+                    icon: Icons.dark_mode_outlined,
+                    title: tr('Modo oscuro', 'Dark mode'),
+                    trailing: ValueListenableBuilder<ThemeMode>(
+                      valueListenable: themeNotifier,
+                      builder: (context, currentMode, child) {
+                        return Switch(
+                          value: currentMode == ThemeMode.dark,
+                          onChanged: (value) => themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light,
+                          activeColor: AppTheme.primaryColor,
+                        );
+                      },
+                    ),
+                    onTap: () {
+                      final isDark = themeNotifier.value == ThemeMode.dark;
+                      themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
+                    },
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-            _buildMenuSection(context, tr('Cuenta', 'Account'), [
-              _MenuItem(
-                icon: Icons.person_outline,
-                title: tr('Información personal', 'Personal Information'),
-                onTap: () async {
-                  final result = await Navigator.push(context, MaterialPageRoute(builder: (context) => const PersonalInfoScreen()));
-                  if (result == true) _loadUserData();
-                },
-              ),
-              _MenuItem(
-                icon: Icons.credit_card_outlined,
-                title: tr('Métodos de pago', 'Payment Methods'),
-                onTap: () => _mostrarMetodosPago(context),
-              ),
-              _MenuItem(
-                icon: Icons.location_on_outlined,
-                title: tr('Direcciones', 'Addresses'),
-                onTap: () => _mostrarDirecciones(context),
-              ),
-            ]),
-            const SizedBox(height: 16),
-            _buildMenuSection(context, tr('Preferencias', 'Preferences'), [
-              _MenuItem(
-                icon: Icons.notifications_outlined,
-                title: tr('Notificaciones', 'Notifications'),
-                trailing: ValueListenableBuilder<bool>(
-                  valueListenable: notificationsNotifier,
-                  builder: (context, isEnabled, child) {
-                    return Switch(
-                      value: isEnabled,
-                      onChanged: (value) => notificationsNotifier.value = value,
-                      activeColor: AppTheme.primaryColor,
-                    );
-                  },
+                ]),
+                const SizedBox(height: 16),
+                _buildMenuSection(context, tr('Soporte', 'Support'), [
+                  _MenuItem(icon: Icons.help_outline, title: tr('Centro de ayuda', 'Help Center'), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const HelpCenterScreen()))),
+                  _MenuItem(icon: Icons.chat_outlined, title: tr('Contactar soporte', 'Contact Support'), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ContactSupportScreen()))),
+                  _MenuItem(icon: Icons.description_outlined, title: tr('Términos y condiciones', 'Terms & Conditions'), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TermsConditionsScreen()))),
+                ]),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => isLoggedInNotifier.value = false,
+                    icon: const Icon(Icons.logout, color: AppTheme.errorColor),
+                    label: Text(tr('Cerrar sesión', 'Log out'), style: const TextStyle(color: AppTheme.errorColor)),
+                    style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor), padding: const EdgeInsets.symmetric(vertical: 14)),
+                  ),
                 ),
-                onTap: () => notificationsNotifier.value = !notificationsNotifier.value,
-              ),
-              _MenuItem(icon: Icons.language_outlined, title: tr('Idioma', 'Language'), subtitle: tr('Español', 'English'), onTap: () => _mostrarOpcionesIdioma(context)),
-              _MenuItem(
-                icon: Icons.dark_mode_outlined,
-                title: tr('Modo oscuro', 'Dark mode'),
-                trailing: ValueListenableBuilder<ThemeMode>(
-                  valueListenable: themeNotifier,
-                  builder: (context, currentMode, child) {
-                    return Switch(
-                      value: currentMode == ThemeMode.dark,
-                      onChanged: (value) => themeNotifier.value = value ? ThemeMode.dark : ThemeMode.light,
-                      activeColor: AppTheme.primaryColor,
-                    );
-                  },
-                ),
-                onTap: () {
-                  final isDark = themeNotifier.value == ThemeMode.dark;
-                  themeNotifier.value = isDark ? ThemeMode.light : ThemeMode.dark;
-                },
-              ),
-            ]),
-            const SizedBox(height: 16),
-            _buildMenuSection(context, tr('Soporte', 'Support'), [
-              _MenuItem(icon: Icons.help_outline, title: tr('Centro de ayuda', 'Help Center'), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const HelpCenterScreen()))),
-              _MenuItem(icon: Icons.chat_outlined, title: tr('Contactar soporte', 'Contact Support'), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ContactSupportScreen()))),
-              _MenuItem(icon: Icons.description_outlined, title: tr('Términos y condiciones', 'Terms & Conditions'), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const TermsConditionsScreen()))),
-            ]),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => isLoggedInNotifier.value = false,
-                icon: const Icon(Icons.logout, color: AppTheme.errorColor),
-                label: Text(tr('Cerrar sesión', 'Log out'), style: const TextStyle(color: AppTheme.errorColor)),
-                style: OutlinedButton.styleFrom(side: const BorderSide(color: AppTheme.errorColor), padding: const EdgeInsets.symmetric(vertical: 14)),
-              ),
+                const SizedBox(height: 16),
+                Text(tr('Versión 1.0.0', 'Version 1.0.0'), style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(height: 40),
+              ],
             ),
-            const SizedBox(height: 16),
-            Text(tr('Versión 1.0.0', 'Version 1.0.0'), style: Theme.of(context).textTheme.bodySmall),
-            const SizedBox(height: 40),
-          ],
-        ),
-      ),
+          ),
+        );
+      }
     );
   }
 
@@ -517,6 +515,5 @@ class _MenuItem {
   final String? subtitle;
   final Widget? trailing;
   final VoidCallback onTap;
-
   _MenuItem({required this.icon, required this.title, this.subtitle, this.trailing, required this.onTap});
 }

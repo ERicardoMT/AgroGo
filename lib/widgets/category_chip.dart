@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/category.dart';
 import '../theme/app_theme.dart';
-import '../globals.dart'; // <--- IMPORT GLOBAL
+import '../globals.dart'; 
 
 class CategoryChip extends StatelessWidget {
   final Category category;
@@ -17,9 +17,9 @@ class CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark; // DETECCIÓN DE TEMA
+    final isDark = Theme.of(context).brightness == Brightness.dark; 
 
-    // Pequeño traductor para los nombres de las categorías que vienen de la base de datos
+    // Pequeño traductor para los nombres de las categorías
     String translatedName = category.name;
     if (languageNotifier.value == 'Inglés') {
       switch (category.name) {
@@ -27,6 +27,8 @@ class CategoryChip extends StatelessWidget {
         case 'Cosechadoras': translatedName = 'Harvesters'; break;
         case 'Riego': translatedName = 'Irrigation'; break;
         case 'Sembradoras': translatedName = 'Seeders'; break;
+        case 'Fumigación': translatedName = 'Fumigation'; break;
+        case 'Transporte': translatedName = 'Transport'; break;
       }
     }
 
@@ -39,12 +41,12 @@ class CategoryChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: isSelected
               ? AppTheme.primaryColor.withOpacity(0.1)
-              : (isDark ? Colors.grey[900] : AppTheme.cardColor), // ADAPTACIÓN
+              : (isDark ? Colors.grey[900] : AppTheme.cardColor), 
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected 
                 ? AppTheme.primaryColor 
-                : (isDark ? Colors.grey[800]! : AppTheme.borderColor), // ADAPTACIÓN
+                : (isDark ? Colors.grey[800]! : AppTheme.borderColor), 
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -56,7 +58,7 @@ class CategoryChip extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isSelected
                     ? AppTheme.primaryColor.withOpacity(0.15)
-                    : (isDark ? Colors.grey[800] : AppTheme.backgroundColor), // ADAPTACIÓN
+                    : (isDark ? Colors.grey[800] : AppTheme.backgroundColor), 
                 shape: BoxShape.circle,
               ),
               child: Text(
@@ -72,7 +74,7 @@ class CategoryChip extends StatelessWidget {
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                 color: isSelected 
                     ? AppTheme.primaryColor 
-                    : (isDark ? Colors.white : AppTheme.textPrimary), // ADAPTACIÓN
+                    : (isDark ? Colors.white : AppTheme.textPrimary), 
               ),
               textAlign: TextAlign.center,
               maxLines: 1,
