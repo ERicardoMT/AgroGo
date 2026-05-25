@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/equipment.dart';
 import '../theme/app_theme.dart';
@@ -45,18 +46,38 @@ class EquipmentCard extends StatelessWidget {
               child: Stack(
                 children: [
                   Container(
+                    width: double.infinity,
                     decoration: BoxDecoration(
                       color: isDark ? Colors.grey[800] : AppTheme.primaryColor.withOpacity(0.08), // ADAPTACIÓN
                       borderRadius: const BorderRadius.vertical(
                         top: Radius.circular(16),
                       ),
                     ),
-                    child: Center(
-                      child: Icon(
-                        Icons.agriculture,
-                        size: 48,
-                        color: AppTheme.primaryColor.withOpacity(0.4),
+                    child: ClipRRect(
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(16),
                       ),
+                      child: equipment.images.isNotEmpty && equipment.images.first.isNotEmpty
+                          ? Image.file(
+                              File(equipment.images.first),
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Center(
+                                  child: Icon(
+                                    Icons.agriculture,
+                                    size: 48,
+                                    color: AppTheme.primaryColor.withOpacity(0.4),
+                                  ),
+                                );
+                              },
+                            )
+                          : Center(
+                              child: Icon(
+                                Icons.agriculture,
+                                size: 48,
+                                color: AppTheme.primaryColor.withOpacity(0.4),
+                              ),
+                            ),
                     ),
                   ),
                   // Status Badge

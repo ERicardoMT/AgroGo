@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/equipment.dart';
 import '../theme/app_theme.dart';
@@ -109,30 +110,61 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
               const SizedBox(width: 8),
             ],
             flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                color: AppTheme.primaryColor.withOpacity(0.1),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 60),
-                      Icon(
-                        Icons.agriculture,
-                        size: 80,
-                        color: AppTheme.primaryColor.withOpacity(0.5),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        equipment.category,
-                        style: TextStyle(
-                          color: AppTheme.primaryColor.withOpacity(0.7),
-                          fontSize: 16,
+              background: equipment.images.isNotEmpty && equipment.images.first.isNotEmpty
+                  ? Image.file(
+                      File(equipment.images.first),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const SizedBox(height: 60),
+                                Icon(
+                                  Icons.agriculture,
+                                  size: 80,
+                                  color: AppTheme.primaryColor.withOpacity(0.5),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  equipment.category,
+                                  style: TextStyle(
+                                    color: AppTheme.primaryColor.withOpacity(0.7),
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    )
+                  : Container(
+                      color: AppTheme.primaryColor.withOpacity(0.1),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(height: 60),
+                            Icon(
+                              Icons.agriculture,
+                              size: 80,
+                              color: AppTheme.primaryColor.withOpacity(0.5),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              equipment.category,
+                              style: TextStyle(
+                                color: AppTheme.primaryColor.withOpacity(0.7),
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
             ),
           ),
 
