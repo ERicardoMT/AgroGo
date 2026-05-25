@@ -3,6 +3,7 @@ import 'implement.dart';
 class LandlordEquipment {
   final String id;
   final String name;
+  final String category;
   final String brand;
   final String model;
   final int year;
@@ -12,7 +13,8 @@ class LandlordEquipment {
   final double usageHours;
   final bool isActive; // Disponible/Activo o Inactivo/En Taller
   final List<String>? imageUrls;
-  final String? condition; // 'Excelente', 'Bueno', 'Regular', 'Requiere Mantenimiento'
+  final String?
+  condition; // 'Excelente', 'Bueno', 'Regular', 'Requiere Mantenimiento'
   final List<Implement>? implements;
   final double? hourlyRate;
   final DateTime createdAt;
@@ -21,6 +23,7 @@ class LandlordEquipment {
   LandlordEquipment({
     required this.id,
     required this.name,
+    this.category = 'Tractores',
     required this.brand,
     required this.model,
     required this.year,
@@ -41,6 +44,7 @@ class LandlordEquipment {
     return LandlordEquipment(
       id: json['id'] as String,
       name: json['name'] as String,
+      category: json['category'] as String? ?? 'Tractores',
       brand: json['brand'] as String,
       model: json['model'] as String,
       year: json['year'] as int,
@@ -63,28 +67,30 @@ class LandlordEquipment {
   }
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'brand': brand,
-        'model': model,
-        'year': year,
-        'power': power,
-        'transmission': transmission,
-        'traction': traction,
-        'usageHours': usageHours,
-        'isActive': isActive,
-        'imageUrls': imageUrls,
-        'condition': condition,
-        'implements': implements?.map((e) => e.toJson()).toList(),
-        'hourlyRate': hourlyRate,
-        'dailyRate': hourlyRate,
-        'createdAt': createdAt.toIso8601String(),
-        'lastMaintenanceDate': lastMaintenanceDate?.toIso8601String(),
-      };
+    'id': id,
+    'name': name,
+    'category': category,
+    'brand': brand,
+    'model': model,
+    'year': year,
+    'power': power,
+    'transmission': transmission,
+    'traction': traction,
+    'usageHours': usageHours,
+    'isActive': isActive,
+    'imageUrls': imageUrls,
+    'condition': condition,
+    'implements': implements?.map((e) => e.toJson()).toList(),
+    'hourlyRate': hourlyRate,
+    'dailyRate': hourlyRate,
+    'createdAt': createdAt.toIso8601String(),
+    'lastMaintenanceDate': lastMaintenanceDate?.toIso8601String(),
+  };
 
   LandlordEquipment copyWith({
     String? id,
     String? name,
+    String? category,
     String? brand,
     String? model,
     int? year,
@@ -103,6 +109,7 @@ class LandlordEquipment {
     return LandlordEquipment(
       id: id ?? this.id,
       name: name ?? this.name,
+      category: category ?? this.category,
       brand: brand ?? this.brand,
       model: model ?? this.model,
       year: year ?? this.year,

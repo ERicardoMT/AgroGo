@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import '../globals.dart';
@@ -29,29 +29,30 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
   Future<void> _loadEquipmentFromDB() async {
     final dbHelper = DatabaseHelper();
     final allEquipments = await dbHelper.getAll('landlord_equipments');
-    
+
     setState(() {
       equipment = allEquipments.map((map) {
         // Debemos decodificar implements si existe
         List<Implement>? implementsList;
         if (map['implements'] != null) {
           try {
-             final List decoded = jsonDecode(map['implements'].toString());
-             implementsList = decoded.map((e) => Implement.fromJson(e)).toList();
-          } catch(e) {}
+            final List decoded = jsonDecode(map['implements'].toString());
+            implementsList = decoded.map((e) => Implement.fromJson(e)).toList();
+          } catch (e) {}
         }
-        
+
         List<String>? imgList;
         if (map['imageUrls'] != null) {
-           try {
-             final List decoded = jsonDecode(map['imageUrls'].toString());
-             imgList = List<String>.from(decoded);
-           } catch(e) {}
+          try {
+            final List decoded = jsonDecode(map['imageUrls'].toString());
+            imgList = List<String>.from(decoded);
+          } catch (e) {}
         }
-        
+
         return LandlordEquipment(
           id: map['id'].toString(),
           name: map['name'].toString(),
+          category: map['category']?.toString() ?? 'Tractores',
           brand: map['brand'].toString(),
           model: map['model'].toString(),
           year: map['year'] != null ? map['year'] as int : 2020,
@@ -61,9 +62,13 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
           usageHours: (map['usageHours'] as num?)?.toDouble() ?? 0.0,
           isActive: map['isActive'] == 1,
           condition: map['condition']?.toString(),
-          hourlyRate: (map['hourlyRate'] ?? map['dailyRate'] as num?)?.toDouble(),
-          createdAt: DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now(),
-          lastMaintenanceDate: map['lastMaintenanceDate'] != null ? DateTime.tryParse(map['lastMaintenanceDate'].toString()) : null,
+          hourlyRate: (map['hourlyRate'] ?? map['dailyRate'] as num?)
+              ?.toDouble(),
+          createdAt:
+              DateTime.tryParse(map['createdAt'].toString()) ?? DateTime.now(),
+          lastMaintenanceDate: map['lastMaintenanceDate'] != null
+              ? DateTime.tryParse(map['lastMaintenanceDate'].toString())
+              : null,
           imageUrls: imgList,
           implements: implementsList,
         );
@@ -72,125 +77,127 @@ class _FleetManagementScreenState extends State<FleetManagementScreen> {
     });
   }
 
-Future<void> _saveEquipmentToDB(LandlordEquipment eq) async {
-  final dbHelper = DatabaseHelper();
+  Future<void> _saveEquipmentToDB(LandlordEquipment eq) async {
+    final dbHelper = DatabaseHelper();
 
-  final landlordMap = {
-    'id': eq.id,
-    'name': eq.name,
-    'brand': eq.brand,
-    'model': eq.model,
-    'year': eq.year,
-    'power': eq.power,
-    'transmission': eq.transmission,
-    'traction': eq.traction,
-    'usageHours': eq.usageHours,
-    'isActive': eq.isActive ? 1 : 0,
-    'imageUrls': eq.imageUrls != null ? jsonEncode(eq.imageUrls) : null,
-    'condition': eq.condition,
-    'implements': eq.implements != null
-        ? jsonEncode(eq.implements!.map((i) => i.toJson()).toList())
-        : null,
-    'dailyRate': eq.hourlyRate,
-    'createdAt': eq.createdAt.toIso8601String(),
-    'lastMaintenanceDate': eq.lastMaintenanceDate?.toIso8601String(),
-  };
+    final landlordMap = {
+      'id': eq.id,
+      'name': eq.name,
+      'category': eq.category,
+      'brand': eq.brand,
+      'model': eq.model,
+      'year': eq.year,
+      'power': eq.power,
+      'transmission': eq.transmission,
+      'traction': eq.traction,
+      'usageHours': eq.usageHours,
+      'isActive': eq.isActive ? 1 : 0,
+      'imageUrls': eq.imageUrls != null ? jsonEncode(eq.imageUrls) : null,
+      'condition': eq.condition,
+      'implements': eq.implements != null
+          ? jsonEncode(eq.implements!.map((i) => i.toJson()).toList())
+          : null,
+      'dailyRate': eq.hourlyRate,
+      'createdAt': eq.createdAt.toIso8601String(),
+      'lastMaintenanceDate': eq.lastMaintenanceDate?.toIso8601String(),
+    };
 
-  await dbHelper.insert('landlord_equipments', landlordMap);
+    await dbHelper.insert('landlord_equipments', landlordMap);
 
-  // Sincronización con el catálogo público que ve el rentador.
-  // Optimización local: reutilizamos el mismo id del tractor para evitar duplicados.
-  final publicEquipmentMap = {
-    'id': eq.id,
-    'name': eq.name,
-    'category': 'Tractores',
-    'description':
-        '${eq.brand} ${eq.model} ${eq.year}. Potencia: ${eq.power.toStringAsFixed(0)} HP. Transmisión: ${eq.transmission}. Tracción: ${eq.traction}.',
-    'location': 'Ubicación del arrendador',
-    'pricePerDay': eq.hourlyRate ?? 0.0,
-    'pricePerWeek': (eq.hourlyRate ?? 0.0) * 7,
-    'pricePerMonth': (eq.hourlyRate ?? 0.0) * 30,
-    'rating': 4.8,
-    'reviewCount': 0,
-    'available': eq.isActive ? 1 : 0,
-    'ownerId': 'arrendador_local',
-    'ownerName': 'Arrendador AgroGo',
-    'images': eq.imageUrls != null && eq.imageUrls!.isNotEmpty
-        ? eq.imageUrls!.first
-        : '',
-    'specs': jsonEncode({
-      'Marca': eq.brand,
-      'Modelo': eq.model,
-      'Año': eq.year.toString(),
-      'Potencia': '${eq.power.toStringAsFixed(0)} HP',
-      'Transmisión': eq.transmission,
-      'Tracción': eq.traction,
-      'Horas de uso': '${eq.usageHours.toStringAsFixed(0)} h',
-      'Condición': eq.condition ?? 'Buena',
-    }),
-  };
+    // Sincronización con el catálogo público que ve el rentador.
+    // Optimización local: reutilizamos el mismo id del tractor para evitar duplicados.
+    final publicEquipmentMap = {
+      'id': eq.id,
+      'name': eq.name,
+      'category': eq.category,
+      'description':
+          '${eq.brand} ${eq.model} ${eq.year}. Potencia: ${eq.power.toStringAsFixed(0)} HP. Transmisión: ${eq.transmission}. Tracción: ${eq.traction}.',
+      'location': 'Ubicación del arrendador',
+      'pricePerDay': eq.hourlyRate ?? 0.0,
+      'pricePerWeek': (eq.hourlyRate ?? 0.0) * 7,
+      'pricePerMonth': (eq.hourlyRate ?? 0.0) * 30,
+      'rating': 4.8,
+      'reviewCount': 0,
+      'available': eq.isActive ? 1 : 0,
+      'ownerId': 'arrendador_local',
+      'ownerName': 'Arrendador AgroGo',
+      'images': eq.imageUrls != null && eq.imageUrls!.isNotEmpty
+          ? eq.imageUrls!.first
+          : '',
+      'specs': jsonEncode({
+        'Marca': eq.brand,
+        'Modelo': eq.model,
+        'Año': eq.year.toString(),
+        'Potencia': '${eq.power.toStringAsFixed(0)} HP',
+        'Transmisión': eq.transmission,
+        'Tracción': eq.traction,
+        'Horas de uso': '${eq.usageHours.toStringAsFixed(0)} h',
+        'Condición': eq.condition ?? 'Buena',
+      }),
+    };
 
-  await dbHelper.insert('equipments', publicEquipmentMap);
-}
+    await dbHelper.insert('equipments', publicEquipmentMap);
+  }
 
-Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
-  final dbHelper = DatabaseHelper();
+  Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
+    final dbHelper = DatabaseHelper();
 
-  final landlordMap = {
-    'id': eq.id,
-    'name': eq.name,
-    'brand': eq.brand,
-    'model': eq.model,
-    'year': eq.year,
-    'power': eq.power,
-    'transmission': eq.transmission,
-    'traction': eq.traction,
-    'usageHours': eq.usageHours,
-    'isActive': eq.isActive ? 1 : 0,
-    'imageUrls': eq.imageUrls != null ? jsonEncode(eq.imageUrls) : null,
-    'condition': eq.condition,
-    'implements': eq.implements != null
-        ? jsonEncode(eq.implements!.map((i) => i.toJson()).toList())
-        : null,
-    'dailyRate': eq.hourlyRate,
-    'lastMaintenanceDate': eq.lastMaintenanceDate?.toIso8601String(),
-  };
+    final landlordMap = {
+      'id': eq.id,
+      'name': eq.name,
+      'category': eq.category,
+      'brand': eq.brand,
+      'model': eq.model,
+      'year': eq.year,
+      'power': eq.power,
+      'transmission': eq.transmission,
+      'traction': eq.traction,
+      'usageHours': eq.usageHours,
+      'isActive': eq.isActive ? 1 : 0,
+      'imageUrls': eq.imageUrls != null ? jsonEncode(eq.imageUrls) : null,
+      'condition': eq.condition,
+      'implements': eq.implements != null
+          ? jsonEncode(eq.implements!.map((i) => i.toJson()).toList())
+          : null,
+      'dailyRate': eq.hourlyRate,
+      'lastMaintenanceDate': eq.lastMaintenanceDate?.toIso8601String(),
+    };
 
-  await dbHelper.update('landlord_equipments', landlordMap, eq.id);
+    await dbHelper.update('landlord_equipments', landlordMap, eq.id);
 
-  // Actualiza también el catálogo público para que el rentador vea cambios.
-  final publicEquipmentMap = {
-    'id': eq.id,
-    'name': eq.name,
-    'category': 'Tractores',
-    'description':
-        '${eq.brand} ${eq.model} ${eq.year}. Potencia: ${eq.power.toStringAsFixed(0)} HP. Transmisión: ${eq.transmission}. Tracción: ${eq.traction}.',
-    'location': 'Ubicación del arrendador',
-    'pricePerDay': eq.hourlyRate ?? 0.0,
-    'pricePerWeek': (eq.hourlyRate ?? 0.0) * 7,
-    'pricePerMonth': (eq.hourlyRate ?? 0.0) * 30,
-    'rating': 4.8,
-    'reviewCount': 0,
-    'available': eq.isActive ? 1 : 0,
-    'ownerId': 'arrendador_local',
-    'ownerName': 'Arrendador AgroGo',
-    'images': eq.imageUrls != null && eq.imageUrls!.isNotEmpty
-        ? eq.imageUrls!.first
-        : '',
-    'specs': jsonEncode({
-      'Marca': eq.brand,
-      'Modelo': eq.model,
-      'Año': eq.year.toString(),
-      'Potencia': '${eq.power.toStringAsFixed(0)} HP',
-      'Transmisión': eq.transmission,
-      'Tracción': eq.traction,
-      'Horas de uso': '${eq.usageHours.toStringAsFixed(0)} h',
-      'Condición': eq.condition ?? 'Buena',
-    }),
-  };
+    // Actualiza también el catálogo público para que el rentador vea cambios.
+    final publicEquipmentMap = {
+      'id': eq.id,
+      'name': eq.name,
+      'category': eq.category,
+      'description':
+          '${eq.brand} ${eq.model} ${eq.year}. Potencia: ${eq.power.toStringAsFixed(0)} HP. Transmisión: ${eq.transmission}. Tracción: ${eq.traction}.',
+      'location': 'Ubicación del arrendador',
+      'pricePerDay': eq.hourlyRate ?? 0.0,
+      'pricePerWeek': (eq.hourlyRate ?? 0.0) * 7,
+      'pricePerMonth': (eq.hourlyRate ?? 0.0) * 30,
+      'rating': 4.8,
+      'reviewCount': 0,
+      'available': eq.isActive ? 1 : 0,
+      'ownerId': 'arrendador_local',
+      'ownerName': 'Arrendador AgroGo',
+      'images': eq.imageUrls != null && eq.imageUrls!.isNotEmpty
+          ? eq.imageUrls!.first
+          : '',
+      'specs': jsonEncode({
+        'Marca': eq.brand,
+        'Modelo': eq.model,
+        'Año': eq.year.toString(),
+        'Potencia': '${eq.power.toStringAsFixed(0)} HP',
+        'Transmisión': eq.transmission,
+        'Tracción': eq.traction,
+        'Horas de uso': '${eq.usageHours.toStringAsFixed(0)} h',
+        'Condición': eq.condition ?? 'Buena',
+      }),
+    };
 
-  await dbHelper.insert('equipments', publicEquipmentMap);
-}
+    await dbHelper.insert('equipments', publicEquipmentMap);
+  }
 
   Future<void> _toggleEquipmentAvailability(int index) async {
     final updatedEq = equipment[index].copyWith(
@@ -215,7 +222,7 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
       SnackBar(
         behavior: SnackBarBehavior.floating,
         content: Text(
-          tr('Tractor agregado exitosamente', 'Tractor added successfully'),
+          tr('Equipo agregado exitosamente', 'Equipment added successfully'),
         ),
       ),
     );
@@ -224,9 +231,7 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
   Future<void> _showEquipmentDetails(LandlordEquipment eq) async {
     final result = await Navigator.push<LandlordEquipment>(
       context,
-      MaterialPageRoute(
-        builder: (_) => EquipmentFormScreen(equipment: eq),
-      ),
+      MaterialPageRoute(builder: (_) => EquipmentFormScreen(equipment: eq)),
     );
     if (result == null || !mounted) return;
     setState(() {
@@ -248,15 +253,17 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFFAFAFA),
+      backgroundColor: isDark
+          ? const Color(0xFF121212)
+          : const Color(0xFFFAFAFA),
       appBar: AppBar(
         elevation: 0,
         backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
         title: Text(
-          tr('Mis Tractores', 'My Tractors'),
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
+          tr('Mis Equipos', 'My Equipment'),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
         ),
         actions: [
           IconButton(
@@ -265,8 +272,10 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
                 SnackBar(
                   behavior: SnackBarBehavior.floating,
                   content: Text(
-                    tr('Filtros pendiente de implementaciÃ³n',
-                        'Filters pending implementation'),
+                    tr(
+                      'Filtros pendiente de implementaciÃ³n',
+                      'Filters pending implementation',
+                    ),
                   ),
                 ),
               );
@@ -278,18 +287,15 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : equipment.isEmpty
-              ? _buildEmptyState(isDark)
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Column(
-                    children: [
+          ? _buildEmptyState(isDark)
+          : SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                children: [
                   ...equipment.asMap().entries.map(
-                        (entry) => _buildEquipmentCard(
-                          entry.value,
-                          entry.key,
-                          isDark,
-                        ),
-                      ),
+                    (entry) =>
+                        _buildEquipmentCard(entry.value, entry.key, isDark),
+                  ),
                   const SizedBox(height: 20),
                 ],
               ),
@@ -297,7 +303,7 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddEquipmentDialog,
         icon: const Icon(Icons.add_rounded),
-        label: Text(tr('Agregar Tractor', 'Add Tractor')),
+        label: Text(tr('Agregar Equipo', 'Add Equipment')),
       ),
     );
   }
@@ -322,17 +328,19 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
           ),
           const SizedBox(height: 20),
           Text(
-            tr('Sin tractores registrados', 'No tractors registered'),
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+            tr('Sin equipos registrados', 'No equipment registered'),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Text(
-            tr('Agrega tu primer tractor para comenzar',
-                'Add your first tractor to get started'),
+            tr(
+              'Agrega tu primer equipo para comenzar',
+              'Add your first equipment to get started',
+            ),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: isDark ? Colors.grey[400] : Colors.grey[700],
+              color: isDark ? Colors.grey[400] : Colors.grey[700],
             ),
             textAlign: TextAlign.center,
           ),
@@ -340,18 +348,14 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
           ElevatedButton.icon(
             onPressed: _showAddEquipmentDialog,
             icon: const Icon(Icons.add_rounded),
-            label: Text(tr('Agregar Tractor', 'Add Tractor')),
+            label: Text(tr('Agregar Equipo', 'Add Equipment')),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildEquipmentCard(
-    LandlordEquipment eq,
-    int index,
-    bool isDark,
-  ) {
+  Widget _buildEquipmentCard(LandlordEquipment eq, int index, bool isDark) {
     return GestureDetector(
       onTap: () => _showEquipmentDetails(eq),
       child: Container(
@@ -387,21 +391,15 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
                           children: [
                             Text(
                               eq.name,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w700),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${eq.brand} ${eq.model} (${eq.year})',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
+                              '${eq.brand} ${eq.model} (${eq.year}) • ${eq.category}',
+                              style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
                                     color: isDark
                                         ? Colors.grey[400]
@@ -426,9 +424,12 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
                           eq.isActive
                               ? tr('Disponible', 'Available')
                               : tr('En Taller', 'In Workshop'),
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
                                 fontWeight: FontWeight.w600,
-                                color: eq.isActive ? Colors.green : Colors.orange,
+                                color: eq.isActive
+                                    ? Colors.green
+                                    : Colors.orange,
                               ),
                         ),
                       ),
@@ -470,7 +471,8 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
                       children: [
                         Text(
                           tr('Implementos', 'Implements'),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
                                 fontWeight: FontWeight.w600,
                                 color: isDark
                                     ? Colors.grey[400]
@@ -500,9 +502,7 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
                                     style: Theme.of(context)
                                         .textTheme
                                         .labelSmall
-                                        ?.copyWith(
-                                          color: AppTheme.accentColor,
-                                        ),
+                                        ?.copyWith(color: AppTheme.accentColor),
                                   ),
                                 ),
                               )
@@ -512,11 +512,11 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
                           Padding(
                             padding: const EdgeInsets.only(top: 6),
                             child: Text(
-                              tr('+${eq.implements!.length - 3} mÃ¡s',
-                                  '+${eq.implements!.length - 3} more'),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
+                              tr(
+                                '+${eq.implements!.length - 3} mÃ¡s',
+                                '+${eq.implements!.length - 3} more',
+                              ),
+                              style: Theme.of(context).textTheme.labelSmall
                                   ?.copyWith(
                                     color: AppTheme.accentColor,
                                     fontWeight: FontWeight.w600,
@@ -538,16 +538,22 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
                                 behavior: SnackBarBehavior.floating,
                                 content: Text(
                                   eq.isActive
-                                      ? tr('Marcado como inactivo',
-                                          'Marked as inactive')
-                                      : tr('Marcado como disponible',
-                                          'Marked as available'),
+                                      ? tr(
+                                          'Marcado como inactivo',
+                                          'Marked as inactive',
+                                        )
+                                      : tr(
+                                          'Marcado como disponible',
+                                          'Marked as available',
+                                        ),
                                 ),
                               ),
                             );
                           },
                           icon: Icon(
-                            eq.isActive ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            eq.isActive
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
                           ),
                           label: Text(
                             eq.isActive
@@ -576,8 +582,9 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
   }
 
   Widget _buildEquipmentImage(LandlordEquipment eq, bool isDark) {
-    final imagePath =
-        eq.imageUrls != null && eq.imageUrls!.isNotEmpty ? eq.imageUrls!.first : null;
+    final imagePath = eq.imageUrls != null && eq.imageUrls!.isNotEmpty
+        ? eq.imageUrls!.first
+        : null;
 
     return Container(
       width: double.infinity,
@@ -624,9 +631,9 @@ Future<void> _updateEquipmentInDB(LandlordEquipment eq) async {
           Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppTheme.primaryColor,
-                  fontWeight: FontWeight.w500,
-                ),
+              color: AppTheme.primaryColor,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),

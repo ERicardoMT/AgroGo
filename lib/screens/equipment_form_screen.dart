@@ -28,10 +28,12 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
   late final TextEditingController _powerController;
   late final TextEditingController _hoursController;
   late final TextEditingController _hourlyRateController;
-  final TextEditingController _implementNameController = TextEditingController();
+  final TextEditingController _implementNameController =
+      TextEditingController();
 
   String? _imagePath;
   bool _pickingImage = false;
+  String _selectedCategory = 'Tractores';
   String _selectedTransmission = 'Manual';
   String _selectedTraction = '4WD';
   String _selectedCondition = 'Bueno';
@@ -56,6 +58,7 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
       text: eq?.hourlyRate?.toString() ?? '',
     );
     if (eq != null) {
+      _selectedCategory = eq.category;
       _selectedTransmission = eq.transmission;
       _selectedTraction = eq.traction;
       _selectedCondition = eq.condition ?? 'Bueno';
@@ -112,6 +115,7 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
     final result = widget.isEditing
         ? widget.equipment!.copyWith(
             name: _nameController.text.trim(),
+            category: _selectedCategory,
             brand: _brandController.text.trim(),
             model: _modelController.text.trim(),
             year: int.parse(_yearController.text),
@@ -121,12 +125,15 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
             usageHours: double.parse(_hoursController.text),
             condition: _selectedCondition,
             hourlyRate: double.tryParse(_hourlyRateController.text),
-            imageUrls: _imagePath != null ? [_imagePath!] : widget.equipment!.imageUrls,
+            imageUrls: _imagePath != null
+                ? [_imagePath!]
+                : widget.equipment!.imageUrls,
             implements: _implements,
           )
         : LandlordEquipment(
             id: 'E${DateTime.now().millisecondsSinceEpoch}',
             name: _nameController.text.trim(),
+            category: _selectedCategory,
             brand: _brandController.text.trim(),
             model: _modelController.text.trim(),
             year: int.parse(_yearController.text),
@@ -150,12 +157,14 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFFAFAFA),
+      backgroundColor: isDark
+          ? const Color(0xFF121212)
+          : const Color(0xFFFAFAFA),
       appBar: AppBar(
         title: Text(
           widget.isEditing
-              ? tr('Editar Tractor', 'Edit Tractor')
-              : tr('Agregar Nuevo Tractor', 'Add New Tractor'),
+              ? tr('Editar Equipo', 'Edit Equipment')
+              : tr('Agregar Nuevo Equipo', 'Add New Equipment'),
         ),
       ),
       body: Form(
@@ -165,115 +174,157 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
           children: [
             _imageSection(isDark),
             const SizedBox(height: 20),
-            if (!widget.isEditing) ...[
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: tr('Nombre', 'Name'),
+            TextFormField(
+              controller: _nameController,
+              decoration: InputDecoration(labelText: tr('Nombre', 'Name')),
+              validator: (v) =>
+                  v == null || v.isEmpty ? tr('Requerido', 'Required') : null,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedCategory,
+              decoration: InputDecoration(
+                labelText: tr('Categoría', 'Category'),
+              ),
+              items:
+                  [
+                    'Tractores',
+                    'Cosechadoras',
+                    'Riego',
+                    'Sembradoras',
+                    'Fumigación',
+                    'Transporte',
+                  ].map((String cat) {
+                    return DropdownMenuItem(value: cat, child: Text(cat));
+                  }).toList(),
+              onChanged: (val) {
+                if (val != null) setState(() => _selectedCategory = val);
+              },
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _brandController,
+                    decoration: InputDecoration(
+                      labelText: tr('Marca', 'Brand'),
+                    ),
+                    validator: (v) => v == null || v.isEmpty
+                        ? tr('Requerido', 'Required')
+                        : null,
+                  ),
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? tr('Requerido', 'Required') : null,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _brandController,
-                      decoration: InputDecoration(labelText: tr('Marca', 'Brand')),
-                      validator: (v) =>
-                          v == null || v.isEmpty ? tr('Requerido', 'Required') : null,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextFormField(
+                    controller: _modelController,
+                    decoration: InputDecoration(
+                      labelText: tr('Modelo', 'Model'),
                     ),
+                    validator: (v) => v == null || v.isEmpty
+                        ? tr('Requerido', 'Required')
+                        : null,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _modelController,
-                      decoration: InputDecoration(labelText: tr('Modelo', 'Model')),
-                      validator: (v) =>
-                          v == null || v.isEmpty ? tr('Requerido', 'Required') : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _yearController,
-                      decoration: InputDecoration(labelText: tr('Año', 'Year')),
-                      keyboardType: TextInputType.number,
-                      validator: (v) =>
-                          v == null || v.isEmpty ? tr('Requerido', 'Required') : null,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _powerController,
-                      decoration: InputDecoration(
-                        labelText: tr('Potencia (HP)', 'Power (HP)'),
-                      ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      validator: (v) =>
-                          v == null || v.isEmpty ? tr('Requerido', 'Required') : null,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedTransmission,
-                decoration: InputDecoration(
-                  labelText: tr('Transmisión', 'Transmission'),
                 ),
-                items: ['Manual', 'Automática', 'CVT']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedTransmission = v ?? 'Manual'),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedTraction,
-                decoration: InputDecoration(labelText: tr('Tracción', 'Traction')),
-                items: ['2WD', '4WD', 'AWD']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedTraction = v ?? '4WD'),
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _hoursController,
-                decoration: InputDecoration(
-                  labelText: tr('Horas de uso', 'Usage hours'),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _yearController,
+                    decoration: InputDecoration(labelText: tr('Año', 'Year')),
+                    keyboardType: TextInputType.number,
+                    validator: (v) => v == null || v.isEmpty
+                        ? tr('Requerido', 'Required')
+                        : null,
+                  ),
                 ),
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                validator: (v) =>
-                    v == null || v.isEmpty ? tr('Requerido', 'Required') : null,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextFormField(
+                    controller: _powerController,
+                    decoration: InputDecoration(
+                      labelText: tr('Potencia (HP)', 'Power (HP)'),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    validator: (v) => v == null || v.isEmpty
+                        ? tr('Requerido', 'Required')
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedTransmission,
+              decoration: InputDecoration(
+                labelText: tr('Transmisión', 'Transmission'),
               ),
-              const SizedBox(height: 12),
-            ],
+              items: [
+                'Manual',
+                'Automática',
+                'CVT',
+              ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: (v) =>
+                  setState(() => _selectedTransmission = v ?? 'Manual'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedTraction,
+              decoration: InputDecoration(
+                labelText: tr('Tracción', 'Traction'),
+              ),
+              items: [
+                '2WD',
+                '4WD',
+                'AWD',
+              ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: (v) => setState(() => _selectedTraction = v ?? '4WD'),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _hoursController,
+              decoration: InputDecoration(
+                labelText: tr('Horas de uso', 'Usage hours'),
+              ),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              validator: (v) =>
+                  v == null || v.isEmpty ? tr('Requerido', 'Required') : null,
+            ),
+            const SizedBox(height: 12),
             TextFormField(
               controller: _hourlyRateController,
               decoration: InputDecoration(
                 labelText: tr('Tarifa por hora (\$)', 'Hourly rate (\$)'),
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               validator: (v) =>
                   v == null || v.isEmpty ? tr('Requerido', 'Required') : null,
             ),
-            if (!widget.isEditing) ...[
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: _selectedCondition,
-                decoration: InputDecoration(labelText: tr('Condición', 'Condition')),
-                items: ['Excelente', 'Bueno', 'Regular', 'Requiere Mantenimiento']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedCondition = v ?? 'Bueno'),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _selectedCondition,
+              decoration: InputDecoration(
+                labelText: tr('Condición', 'Condition'),
               ),
-            ],
+              items: [
+                'Excelente',
+                'Bueno',
+                'Regular',
+                'Requiere Mantenimiento',
+              ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              onChanged: (v) =>
+                  setState(() => _selectedCondition = v ?? 'Bueno'),
+            ),
             if (widget.isEditing) ...[
               const SizedBox(height: 24),
               _implementsSection(isDark),
@@ -292,7 +343,9 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
                   child: ElevatedButton(
                     onPressed: _save,
                     child: Text(
-                      widget.isEditing ? tr('Guardar', 'Save') : tr('Agregar', 'Add'),
+                      widget.isEditing
+                          ? tr('Guardar', 'Save')
+                          : tr('Agregar', 'Add'),
                     ),
                   ),
                 ),
@@ -306,13 +359,15 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
 
   Widget _imageSection(bool isDark) {
     final hasImage =
-        _imagePath != null && _imagePath!.isNotEmpty && File(_imagePath!).existsSync();
+        _imagePath != null &&
+        _imagePath!.isNotEmpty &&
+        File(_imagePath!).existsSync();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          tr('Imagen del tractor', 'Tractor image'),
+          tr('Imagen del equipo', 'Equipment image'),
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
@@ -328,20 +383,20 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
           child: _pickingImage
               ? const CircularProgressIndicator()
               : hasImage
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.file(
-                        File(_imagePath!),
-                        width: double.infinity,
-                        height: 180,
-                        fit: BoxFit.cover,
-                      ),
-                    )
-                  : Icon(
-                      Icons.agriculture_rounded,
-                      size: 56,
-                      color: AppTheme.primaryColor.withValues(alpha: 0.5),
-                    ),
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.file(
+                    File(_imagePath!),
+                    width: double.infinity,
+                    height: 180,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              : Icon(
+                  Icons.agriculture_rounded,
+                  size: 56,
+                  color: AppTheme.primaryColor.withValues(alpha: 0.5),
+                ),
         ),
         const SizedBox(height: 10),
         SizedBox(
@@ -366,9 +421,9 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
       children: [
         Text(
           tr('Implementos (Opcional)', 'Implements (Optional)'),
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 8),
         ..._implements.asMap().entries.map((entry) {
@@ -393,10 +448,14 @@ class _EquipmentFormScreenState extends State<EquipmentFormScreen> {
         DropdownButtonFormField<String>(
           initialValue: _selectedImplementType,
           decoration: InputDecoration(labelText: tr('Tipo', 'Type')),
-          items: ['rastra', 'arado', 'sembradora', 'otro']
-              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-              .toList(),
-          onChanged: (v) => setState(() => _selectedImplementType = v ?? 'rastra'),
+          items: [
+            'rastra',
+            'arado',
+            'sembradora',
+            'otro',
+          ].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+          onChanged: (v) =>
+              setState(() => _selectedImplementType = v ?? 'rastra'),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(

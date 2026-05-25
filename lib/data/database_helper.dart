@@ -29,7 +29,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -153,6 +153,7 @@ class DatabaseHelper {
       CREATE TABLE landlord_equipments (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        category TEXT NOT NULL DEFAULT 'Tractores',
         brand TEXT NOT NULL,
         model TEXT NOT NULL,
         year INTEGER NOT NULL,
@@ -237,14 +238,20 @@ class DatabaseHelper {
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-  if (oldVersion < 2) {
-    await _createRentalTrackingTable(db);
-  }
+    if (oldVersion < 2) {
+      await _createRentalTrackingTable(db);
+    }
 
-  if (oldVersion < 3) {
-    await _createFavoritesAndSearchTables(db);
+    if (oldVersion < 3) {
+      await _createFavoritesAndSearchTables(db);
+    }
+
+    if (oldVersion < 4) {
+      await db.execute(
+        'ALTER TABLE landlord_equipments ADD COLUMN category TEXT DEFAULT "Tractores"',
+      );
+    }
   }
-}
 
   Future<void> _createRentalTrackingTable(Database db) async {
     await db.execute('''
@@ -265,10 +272,10 @@ class DatabaseHelper {
         updatedAt TEXT NOT NULL
       )
     ''');
-    
   }
-Future<void> _createFavoritesAndSearchTables(Database db) async {
-  await db.execute('''
+
+  Future<void> _createFavoritesAndSearchTables(Database db) async {
+    await db.execute('''
     CREATE TABLE IF NOT EXISTS favorite_equipments (
       userId TEXT NOT NULL,
       equipmentId TEXT NOT NULL,
@@ -277,7 +284,7 @@ Future<void> _createFavoritesAndSearchTables(Database db) async {
     )
   ''');
 
-  await db.execute('''
+    await db.execute('''
     CREATE TABLE IF NOT EXISTS search_history (
       id TEXT PRIMARY KEY,
       userId TEXT NOT NULL,
@@ -285,7 +292,8 @@ Future<void> _createFavoritesAndSearchTables(Database db) async {
       createdAt TEXT NOT NULL
     )
   ''');
-}
+  }
+
   Future<int> insert(String table, Map<String, dynamic> data) async {
     final db = await database;
     return await db.insert(
@@ -379,7 +387,9 @@ Future<void> _createFavoritesAndSearchTables(Database db) async {
 
   Future<double> getUserAverageRating() async {
     final db = await database;
-    final result = await db.rawQuery('SELECT AVG(rating) as avgRating FROM reviews');
+    final result = await db.rawQuery(
+      'SELECT AVG(rating) as avgRating FROM reviews',
+    );
 
     if (result.isNotEmpty && result.first['avgRating'] != null) {
       return (result.first['avgRating'] as num).toDouble();
@@ -390,21 +400,25 @@ Future<void> _createFavoritesAndSearchTables(Database db) async {
 
   Future<int> getLandlordTractorsCount() async {
     final db = await database;
-    final result = await db.rawQuery('SELECT COUNT(*) FROM landlord_equipments');
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) FROM landlord_equipments',
+    );
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
   Future<int> getLandlordRentalsCount() async {
     final db = await database;
 
-    final occupancyCount = Sqflite.firstIntValue(
+    final occupancyCount =
+        Sqflite.firstIntValue(
           await db.rawQuery('SELECT COUNT(*) FROM rental_occupancies'),
         ) ??
         0;
 
     if (occupancyCount > 0) return occupancyCount;
 
-    final approvedCount = Sqflite.firstIntValue(
+    final approvedCount =
+        Sqflite.firstIntValue(
           await db.rawQuery(
             "SELECT COUNT(*) FROM rental_requests WHERE status = 'approved'",
           ),
@@ -476,7 +490,9 @@ Future<void> _createFavoritesAndSearchTables(Database db) async {
     final summaries = <MessageNotificationSummary>[];
 
     grouped.forEach((convId, msgs) {
-      final fromOthers = msgs.where((m) => m.senderRole != currentRole).toList();
+      final fromOthers = msgs
+          .where((m) => m.senderRole != currentRole)
+          .toList();
 
       if (fromOthers.isEmpty) return;
 
@@ -528,9 +544,7 @@ Future<void> _createFavoritesAndSearchTables(Database db) async {
 
     final result = await db.query(
       'users',
-      where: excludeEmail == null
-          ? 'email = ?'
-          : 'email = ? AND email != ?',
+      where: excludeEmail == null ? 'email = ?' : 'email = ? AND email != ?',
       whereArgs: excludeEmail == null
           ? [normalized]
           : [normalized, excludeEmail.trim().toLowerCase()],
@@ -566,26 +580,22 @@ Future<void> _createFavoritesAndSearchTables(Database db) async {
     final existing = await getRentalTrackingByBooking(bookingId);
     if (existing != null) return;
 
-    await db.insert(
-      'rental_tracking',
-      {
-        'id': 'tracking_$bookingId',
-        'bookingId': bookingId,
-        'equipmentId': equipmentId,
-        'currentStep': 0,
-        'driverName': 'Operador AgroGo',
-        'driverPhone': '+52 55 1234 5678',
-        'originAddress': 'Patio de maquinaria AgroGo',
-        'destinationAddress': destinationAddress,
-        'currentLatitude': 19.3900,
-        'currentLongitude': -99.1200,
-        'progress': 0.0,
-        'etaMinutes': 45,
-        'isMoving': 0,
-        'updatedAt': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
+    await db.insert('rental_tracking', {
+      'id': 'tracking_$bookingId',
+      'bookingId': bookingId,
+      'equipmentId': equipmentId,
+      'currentStep': 0,
+      'driverName': 'Operador AgroGo',
+      'driverPhone': '+52 55 1234 5678',
+      'originAddress': 'Patio de maquinaria AgroGo',
+      'destinationAddress': destinationAddress,
+      'currentLatitude': 19.3900,
+      'currentLongitude': -99.1200,
+      'progress': 0.0,
+      'etaMinutes': 45,
+      'isMoving': 0,
+      'updatedAt': DateTime.now().toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   Future<void> startTrackingMovement(String bookingId) async {
@@ -632,13 +642,7 @@ Future<void> _createFavoritesAndSearchTables(Database db) async {
       4: 1.0,
     };
 
-    final etaByStep = <int, int>{
-      0: 45,
-      1: 30,
-      2: 15,
-      3: 5,
-      4: 0,
-    };
+    final etaByStep = <int, int>{0: 45, 1: 30, 2: 15, 3: 5, 4: 0};
 
     final latByStep = <int, double>{
       0: 19.3900,
@@ -706,194 +710,181 @@ Future<void> _createFavoritesAndSearchTables(Database db) async {
       whereArgs: [bookingId],
     );
   }
+
   Future<List<String>> getFavoriteIdsForUser(String userId) async {
-  final db = await database;
+    final db = await database;
 
-  final rows = await db.query(
-    'favorite_equipments',
-    columns: ['equipmentId'],
-    where: 'userId = ?',
-    whereArgs: [userId],
-    orderBy: 'createdAt DESC',
-  );
+    final rows = await db.query(
+      'favorite_equipments',
+      columns: ['equipmentId'],
+      where: 'userId = ?',
+      whereArgs: [userId],
+      orderBy: 'createdAt DESC',
+    );
 
-  return rows.map((row) => row['equipmentId'].toString()).toList();
-}
+    return rows.map((row) => row['equipmentId'].toString()).toList();
+  }
 
-Future<bool> isEquipmentFavorite({
-  required String userId,
-  required String equipmentId,
-}) async {
-  final db = await database;
+  Future<bool> isEquipmentFavorite({
+    required String userId,
+    required String equipmentId,
+  }) async {
+    final db = await database;
 
-  final rows = await db.query(
-    'favorite_equipments',
-    where: 'userId = ? AND equipmentId = ?',
-    whereArgs: [userId, equipmentId],
-    limit: 1,
-  );
-
-  return rows.isNotEmpty;
-}
-
-Future<Set<String>> toggleFavoriteEquipment({
-  required String userId,
-  required String equipmentId,
-}) async {
-  final db = await database;
-
-  final exists = await isEquipmentFavorite(
-    userId: userId,
-    equipmentId: equipmentId,
-  );
-
-  if (exists) {
-    await db.delete(
+    final rows = await db.query(
       'favorite_equipments',
       where: 'userId = ? AND equipmentId = ?',
       whereArgs: [userId, equipmentId],
+      limit: 1,
     );
-  } else {
-    await db.insert(
-      'favorite_equipments',
-      {
+
+    return rows.isNotEmpty;
+  }
+
+  Future<Set<String>> toggleFavoriteEquipment({
+    required String userId,
+    required String equipmentId,
+  }) async {
+    final db = await database;
+
+    final exists = await isEquipmentFavorite(
+      userId: userId,
+      equipmentId: equipmentId,
+    );
+
+    if (exists) {
+      await db.delete(
+        'favorite_equipments',
+        where: 'userId = ? AND equipmentId = ?',
+        whereArgs: [userId, equipmentId],
+      );
+    } else {
+      await db.insert('favorite_equipments', {
         'userId': userId,
         'equipmentId': equipmentId,
         'createdAt': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+
+    final ids = await getFavoriteIdsForUser(userId);
+    return ids.toSet();
   }
 
-  final ids = await getFavoriteIdsForUser(userId);
-  return ids.toSet();
-}
+  Future<List<Map<String, dynamic>>> getFavoriteEquipmentsForUser(
+    String userId,
+  ) async {
+    final db = await database;
 
-Future<List<Map<String, dynamic>>> getFavoriteEquipmentsForUser(
-  String userId,
-) async {
-  final db = await database;
-
-  final rows = await db.rawQuery(
-    '''
+    final rows = await db.rawQuery(
+      '''
     SELECT e.*
     FROM favorite_equipments f
     INNER JOIN equipments e ON e.id = f.equipmentId
     WHERE f.userId = ?
     ORDER BY f.createdAt DESC
     ''',
-    [userId],
-  );
+      [userId],
+    );
 
-  return rows;
-}
+    return rows;
+  }
 
-Future<List<Map<String, dynamic>>> getAvailableEquipments() async {
-  final db = await database;
+  Future<List<Map<String, dynamic>>> getAvailableEquipments() async {
+    final db = await database;
 
-  return await db.query(
-    'equipments',
-    where: 'available = ?',
-    whereArgs: [1],
-    orderBy: 'name ASC',
-  );
-}
+    return await db.query(
+      'equipments',
+      where: 'available = ?',
+      whereArgs: [1],
+      orderBy: 'name ASC',
+    );
+  }
 
-Future<void> addSearchTerm({
-  required String userId,
-  required String query,
-}) async {
-  final db = await database;
+  Future<void> addSearchTerm({
+    required String userId,
+    required String query,
+  }) async {
+    final db = await database;
 
-  final cleanQuery = query.trim();
+    final cleanQuery = query.trim();
 
-  if (cleanQuery.isEmpty) return;
+    if (cleanQuery.isEmpty) return;
 
-  // Optimización local: si el usuario repite la misma búsqueda, se elimina
-  // la anterior y se inserta de nuevo para subirla al inicio del historial.
-  await db.delete(
-    'search_history',
-    where: 'userId = ? AND LOWER(query) = LOWER(?)',
-    whereArgs: [userId, cleanQuery],
-  );
+    // Optimización local: si el usuario repite la misma búsqueda, se elimina
+    // la anterior y se inserta de nuevo para subirla al inicio del historial.
+    await db.delete(
+      'search_history',
+      where: 'userId = ? AND LOWER(query) = LOWER(?)',
+      whereArgs: [userId, cleanQuery],
+    );
 
-  await db.insert(
-    'search_history',
-    {
+    await db.insert('search_history', {
       'id': '${userId}_${DateTime.now().millisecondsSinceEpoch}',
       'userId': userId,
       'query': cleanQuery,
       'createdAt': DateTime.now().toIso8601String(),
-    },
-    conflictAlgorithm: ConflictAlgorithm.replace,
-  );
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-  final rows = await db.query(
-    'search_history',
-    columns: ['id'],
-    where: 'userId = ?',
-    whereArgs: [userId],
-    orderBy: 'createdAt DESC',
-    limit: 100,
-  );
-
-  if (rows.length > 10) {
-    final keepIds = rows.take(10).map((row) => row['id']).toList();
-
-    final placeholders = List.filled(keepIds.length, '?').join(',');
-
-    await db.delete(
+    final rows = await db.query(
       'search_history',
-      where: 'userId = ? AND id NOT IN ($placeholders)',
-      whereArgs: [userId, ...keepIds],
+      columns: ['id'],
+      where: 'userId = ?',
+      whereArgs: [userId],
+      orderBy: 'createdAt DESC',
+      limit: 100,
     );
+
+    if (rows.length > 10) {
+      final keepIds = rows.take(10).map((row) => row['id']).toList();
+
+      final placeholders = List.filled(keepIds.length, '?').join(',');
+
+      await db.delete(
+        'search_history',
+        where: 'userId = ? AND id NOT IN ($placeholders)',
+        whereArgs: [userId, ...keepIds],
+      );
+    }
   }
-}
 
-Future<List<String>> getRecentSearches(String userId) async {
-  final db = await database;
+  Future<List<String>> getRecentSearches(String userId) async {
+    final db = await database;
 
-  final rows = await db.query(
-    'search_history',
-    columns: ['query'],
-    where: 'userId = ?',
-    whereArgs: [userId],
-    orderBy: 'createdAt DESC',
-    limit: 10,
-  );
+    final rows = await db.query(
+      'search_history',
+      columns: ['query'],
+      where: 'userId = ?',
+      whereArgs: [userId],
+      orderBy: 'createdAt DESC',
+      limit: 10,
+    );
 
-  return rows.map((row) => row['query'].toString()).toList();
-}
+    return rows.map((row) => row['query'].toString()).toList();
+  }
 
-Future<void> clearSearchHistory(String userId) async {
-  final db = await database;
+  Future<void> clearSearchHistory(String userId) async {
+    final db = await database;
 
-  await db.delete(
-    'search_history',
-    where: 'userId = ?',
-    whereArgs: [userId],
-  );
-}
+    await db.delete('search_history', where: 'userId = ?', whereArgs: [userId]);
+  }
 
-Future<Map<String, int>> getEquipmentCategoryCounts() async {
-  final db = await database;
+  Future<Map<String, int>> getEquipmentCategoryCounts() async {
+    final db = await database;
 
-  final rows = await db.rawQuery(
-    '''
+    final rows = await db.rawQuery('''
     SELECT category, COUNT(*) as total
     FROM equipments
     WHERE available = 1
     GROUP BY category
     ORDER BY total DESC
-    ''',
-  );
+    ''');
 
-  final result = <String, int>{};
+    final result = <String, int>{};
 
-  for (final row in rows) {
-    result[row['category'].toString()] = (row['total'] as int?) ?? 0;
+    for (final row in rows) {
+      result[row['category'].toString()] = (row['total'] as int?) ?? 0;
+    }
+
+    return result;
   }
-
-  return result;
-}
 }
